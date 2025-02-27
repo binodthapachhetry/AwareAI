@@ -116,23 +116,6 @@ class LLamaAndroid {
         }
     }
 
-    fun send(message: String, formatChat: Boolean = false): Flow<String> = flow {
-        when (val state = threadLocalState.get()) {
-            is State.Loaded -> {
-                val ncur = IntVar(completion_init(state.context, state.batch, message, formatChat, nlen))
-                while (ncur.value <= nlen) {
-                    val str = completion_loop(state.context, state.batch, state.sampler, nlen, ncur)
-                    if (str == null) {
-                        break
-                    }
-                    emit(str)
-                }
-                kv_cache_clear(state.context)
-            }
-            else -> {}
-        }
-    }.flowOn(runLoop)
-    
     fun send(context: String, formatChat: Boolean = false): Flow<String> = flow {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
