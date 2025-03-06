@@ -24,6 +24,8 @@ class MainViewModel(
         You are a helpful AI assistant. You aim to be accurate, informative, and engaging.
         You should be direct in your responses and avoid disclaimers.
         If you're unsure about something, admit it rather than making assumptions.
+        Remember the conversation context and respond appropriately to follow-up questions.
+        Keep your responses concise but complete.
     """.trimIndent()
 
     // UI state
@@ -45,13 +47,14 @@ class MainViewModel(
         }
     }
 
+
     fun send() {
         val text = message
         message = ""
 
         // Add to messages console for UI
         messages += "User: $text"
-        messages += ""
+        messages += ""  // Empty string for AI response placeholder
 
         viewModelScope.launch {
             // Create and add user message to session
@@ -61,6 +64,10 @@ class MainViewModel(
             // Prepare context with history and relevant memories
             val context = prepareContext()
 
+            // Variables to track the complete response
+            val responseBuilder = StringBuilder()
+            var tempAiMessage: Message? = null
+
             // Send to LLM
             llamaAndroid.send(context, formatChat = true)
                 .catch {
@@ -68,11 +75,18 @@ class MainViewModel(
                     messages += it.message ?: "Error during LLM processing"
                 }
                 .collect { response ->
-                    // Create and store AI message
-                    val aiMessage = createMessage(response, Message.SenderType.AI)
-                    sessionManager.addMessage(aiMessage)
-                    updateMemory(aiMessage)
-                    
+                    // Accumulate the complete response
+                    responseBuilder.append(response)
+
+                    // If there's a temporary message in the session, remove it
+                    if (tempAiMessage != null) {
+                        sessionManager.removeMessage(tempAiMessage!!.id)
+                    }
+
+                    // Create a new temporary message with the current accumulated response
+                    tempAiMessage = createMessage(responseBuilder.toString(), Message.SenderType.AI)
+                    sessionManager.addMessage(tempAiMessage!!)
+
                     // Update UI
                     if (messages.last().isEmpty()) {
                         messages = messages.dropLast(1) + response
@@ -80,6 +94,21 @@ class MainViewModel(
                         messages = messages.dropLast(1) + (messages.last() + response)
                     }
                 }
+
+            // After collecting is complete, create the final message
+            val fullResponse = responseBuilder.toString()
+
+            // Remove the last temporary message
+            if (tempAiMessage != null) {
+                sessionManager.removeMessage(tempAiMessage!!.id)
+            }
+
+            // Create and add the final complete message
+            val finalAiMessage = createMessage(fullResponse, Message.SenderType.AI)
+            sessionManager.addMessage(finalAiMessage)
+
+            // Only store the complete message in memory
+            updateMemory(finalAiMessage)
         }
     }
 
@@ -96,7 +125,7 @@ class MainViewModel(
 
         return buildString {
             append("System: $systemPrompt\n\n")
-            
+
             if (relevantMemories.isNotEmpty()) {
                 append("Relevant context:\n")
                 relevantMemories.forEach { append("- $it\n") }
@@ -197,7 +226,7 @@ class MainViewModel(
 
     fun clear() {
         messages = listOf()
-        
+
         viewModelScope.launch {
             val sessionId = sessionManager.requireActiveSession().id
             sessionManager.clearSessionMessages(sessionId)

@@ -36,7 +36,7 @@ class LLamaAndroid {
         }
     }.asCoroutineDispatcher()
 
-    private val nlen: Int = 250
+    private val nlen: Int = 1000
 
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
@@ -127,7 +127,7 @@ class LLamaAndroid {
                     }
                     emit(str)
                 }
-                kv_cache_clear(state.context)
+//                kv_cache_clear(state.context)
             }
             else -> {}
         }
