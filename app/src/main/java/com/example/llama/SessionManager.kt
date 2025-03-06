@@ -85,4 +85,19 @@ class SessionManager {
             }
         }
     }
+
+    fun removeMessage(messageId: String) {
+        _sessions.update { sessions ->
+            sessions.map { session ->
+                if (session.id == _activeSessionId.value) {
+                    session.copy(
+                        messages = session.messages.filterNot { it.id == messageId }
+                    )
+                } else {
+                    session
+                }
+            }
+        }
+    }
+
 }

@@ -26,6 +26,9 @@ class MainViewModel(
         If you're unsure about something, admit it rather than making assumptions.
         Remember the conversation context and respond appropriately to follow-up questions.
         Keep your responses concise but complete.
+
+        IMPORTANT: Only respond as the assistant. DO NOT generate user messages or continue the conversation beyond your response.
+        Simply provide your response without any XML tags.
     """.trimIndent()
 
     // UI state
@@ -52,9 +55,13 @@ class MainViewModel(
         val text = message
         message = ""
 
+        Log.d(tag, "send() text: $text")
+
         // Add to messages console for UI
         messages += "User: $text"
         messages += ""  // Empty string for AI response placeholder
+
+        Log.d(tag, "send() messages: $messages")
 
         viewModelScope.launch {
             // Create and add user message to session
@@ -63,6 +70,9 @@ class MainViewModel(
 
             // Prepare context with history and relevant memories
             val context = prepareContext()
+
+            Log.d(tag, "send() context to the LLM: $context.toString()")
+            context.toString()
 
             // Variables to track the complete response
             val responseBuilder = StringBuilder()
@@ -76,36 +86,58 @@ class MainViewModel(
                 }
                 .collect { response ->
                     // Accumulate the complete response
+                    Log.d(tag, "send() message from the LLM: $response")
                     responseBuilder.append(response)
 
                     // If there's a temporary message in the session, remove it
                     if (tempAiMessage != null) {
                         sessionManager.removeMessage(tempAiMessage!!.id)
+                        Log.d(tag, "send() removing tempAiMessage: $tempAiMessage")
                     }
 
                     // Create a new temporary message with the current accumulated response
                     tempAiMessage = createMessage(responseBuilder.toString(), Message.SenderType.AI)
+                    Log.d(tag, "send() created tempAiMessage: $tempAiMessage")
                     sessionManager.addMessage(tempAiMessage!!)
 
                     // Update UI
                     if (messages.last().isEmpty()) {
                         messages = messages.dropLast(1) + response
+                        Log.d(tag, "send() messages last is empty")
                     } else {
                         messages = messages.dropLast(1) + (messages.last() + response)
+                        Log.d(tag, "send() messages last is not empty")
                     }
                 }
 
             // After collecting is complete, create the final message
+
             val fullResponse = responseBuilder.toString()
+
+//            val fullResponse = responseBuilder.toString()
+//                .replace("</ASSISTANT>", "")
+//                .replace("</SYSTEM>", "")
+//                .replace("</USER>", "")
+//                .trim()
+
+            Log.d(tag, "send() got full response from the model: ${fullResponse.toString()}")
+
+//            // Truncate the response if it contains user tags
+//            val userTagIndex = fullResponse.indexOf("<USER>")
+//            if (userTagIndex > 0) {
+//                fullResponse = fullResponse.substring(0, userTagIndex).trim()
+//            }
 
             // Remove the last temporary message
             if (tempAiMessage != null) {
                 sessionManager.removeMessage(tempAiMessage!!.id)
+                Log.d(tag, "send() removed tempAiMessage: ${tempAiMessage.toString()}")
             }
 
             // Create and add the final complete message
             val finalAiMessage = createMessage(fullResponse, Message.SenderType.AI)
             sessionManager.addMessage(finalAiMessage)
+            Log.d(tag, "send() created final message: ${finalAiMessage.text}")
 
             // Only store the complete message in memory
             updateMemory(finalAiMessage)
@@ -124,13 +156,13 @@ class MainViewModel(
         }
 
         return buildString {
-            append("System: $systemPrompt\n\n")
+            append("<SYSTEM>\n$systemPrompt\n</SYSTEM>\n\n")
 
-            if (relevantMemories.isNotEmpty()) {
-                append("Relevant context:\n")
-                relevantMemories.forEach { append("- $it\n") }
-                append("\n")
-            }
+//            if (relevantMemories.isNotEmpty()) {
+//                append("<CONTEXT>\n")
+//                relevantMemories.forEach { append("- $it\n") }
+//                append("</CONTEXT>\n\n")
+//            }
 
             // Apply context window strategy
             when (contextConfig.strategy) {
@@ -138,7 +170,11 @@ class MainViewModel(
                     session.messages
                         .takeLast(contextConfig.nContext)
                         .forEach { message ->
-                            append("${message.sender}: ${message.text}\n")
+                            when (message.sender) {
+                                Message.SenderType.USER -> append("User: ${message.text}\n")
+                                Message.SenderType.AI -> append("Assistant: ${message.text}\n")
+                                else -> append("${message.sender}: ${message.text}\n")
+                            }
                         }
                 }
                 ContextStrategy.SUMMARY -> {
@@ -146,9 +182,18 @@ class MainViewModel(
                     session.messages
                         .takeLast(contextConfig.nContext)
                         .forEach { message ->
-                            append("${message.sender}: ${message.text}\n")
+                            when (message.sender) {
+                                Message.SenderType.USER -> append("User: ${message.text}\n")
+                                Message.SenderType.AI -> append("Assistant: ${message.text}\n")
+                                else -> append("${message.sender}: ${message.text}\n")
+                            }
                         }
                 }
+            }
+
+            // Add a final prompt for the AI to respond
+            if (session.messages.lastOrNull()?.sender == Message.SenderType.USER) {
+                append("Assistant:")
             }
         }
     }

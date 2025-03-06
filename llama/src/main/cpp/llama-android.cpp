@@ -369,9 +369,9 @@ Java_android_llama_cpp_LLamaAndroid_completion_1init(
         LOGe("error: n_kv_req > n_ctx, the required KV cache size is not big enough");
     }
 
-    for (auto id : tokens_list) {
-        LOGi("token: `%s`-> %d ", common_token_to_piece(context, id).c_str(), id);
-    }
+//    for (auto id : tokens_list) {
+//        LOGi("token: `%s`-> %d ", common_token_to_piece(context, id).c_str(), id);
+//    }
 
     common_batch_clear(*batch);
 

@@ -7,6 +7,6 @@ enum class ContextStrategy {
 
 data class ContextConfig(
     val strategy: ContextStrategy = ContextStrategy.SLIDING_WINDOW,
-    val nContext: Int = 10,
+    val nContext: Int = 2,
     val summaryInterval: Int = 20
 )

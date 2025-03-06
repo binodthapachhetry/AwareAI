@@ -117,11 +117,20 @@ class LLamaAndroid {
     }
 
     fun send(context: String, formatChat: Boolean = false): Flow<String> = flow {
+
+        Log.d(tag, "send() message received from the LLM: $context")
+
         when (val state = threadLocalState.get()) {
+
             is State.Loaded -> {
                 val ncur = IntVar(completion_init(state.context, state.batch, context, formatChat, nlen))
+
+                Log.d(tag, "send() ncur: ${ncur.value.toString()}")
+                Log.d(tag, "send() nlen: ${nlen.toString()}")
+
                 while (ncur.value <= nlen) {
                     val str = completion_loop(state.context, state.batch, state.sampler, nlen, ncur)
+                    Log.d(tag, "send() str: ${str}")
                     if (str == null) {
                         break
                     }
