@@ -71,11 +71,17 @@ class MainActivity(
         val extFilesDir = getExternalFilesDir(null)
 
         val models = listOf(
-           
+
+//            Downloadable(
+//                "Llama3.2 3B (int4, 2.0 GiB)",
+//                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf?download=true"),
+//                File(extFilesDir, "Llama-3.2-3B-Instruct-Q4_K_M.gguf"),
+//            ),
+
             Downloadable(
-                "Llama3.2 3B (int4, 2.0 GiB)",
-                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf?download=true"),
-                File(extFilesDir, "Llama-3.2-3B-Instruct-Q4_K_M.gguf"),
+                "Llama3.2 1B (int4, 771 MB)",
+                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_0_4_4.gguf?download=true"),
+                File(extFilesDir, "Llama-3.2-1B-Instruct-Q4_0_4_4.gguf"),
             ),
         )
 

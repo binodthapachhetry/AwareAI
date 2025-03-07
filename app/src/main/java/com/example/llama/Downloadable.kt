@@ -64,6 +64,17 @@ data class Downloadable(val name: String, val source: Uri, val destination: File
                     cursor.close()
 
                     if (sofar == total) {
+                        try {
+                            // Set proper permissions (read/write for owner, read for group/others)
+                            item.destination.setReadable(true, false)  // readable by everyone
+                            item.destination.setWritable(true, true)   // writable only by owner
+                            item.destination.setExecutable(false)      // not executable
+
+                            Log.i(tag, "Download complete, set permissions for ${item.destination.path}")
+                        } catch (e: Exception) {
+                            Log.e(tag, "Failed to set permissions", e)
+                        }
+
                         return Downloaded(item)
                     }
 
