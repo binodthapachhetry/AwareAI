@@ -64,17 +64,9 @@ data class Downloadable(val name: String, val source: Uri, val destination: File
                     cursor.close()
 
                     if (sofar == total) {
-                        try {
-                            // Set proper permissions (read/write for owner, read for group/others)
-                            item.destination.setReadable(true, false)  // readable by everyone
-                            item.destination.setWritable(true, true)   // writable only by owner
-                            item.destination.setExecutable(false)      // not executable
-
-                            Log.i(tag, "Download complete, set permissions for ${item.destination.path}")
-                        } catch (e: Exception) {
-                            Log.e(tag, "Failed to set permissions", e)
-                        }
-
+                        // No need to set permissions for files in app-private storage
+                        // They already have the correct permissions by default
+                        Log.i(tag, "Download complete: ${item.destination.path}")
                         return Downloaded(item)
                     }
 
@@ -104,6 +96,8 @@ data class Downloadable(val name: String, val source: Uri, val destination: File
                             setDescription("Downloading model: ${item.name}")
                             setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
                             setDestinationUri(item.destination.toUri())
+                            // Ensure destination directory exists
+                            item.destination.parentFile?.mkdirs()
                         }
 
                         viewModel.log("Saving ${item.name} to ${item.destination.path}")
