@@ -1,22 +1,23 @@
 package com.example.llama
 
-import android.app.DownloadManager
 import android.net.Uri
 import android.util.Log
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.core.database.getLongOrNull
-import androidx.core.net.toUri
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 data class Downloadable(val name: String, val source: Uri, val destination: File) {
     companion object {
@@ -25,56 +26,22 @@ data class Downloadable(val name: String, val source: Uri, val destination: File
 
         sealed interface State
         data object Ready: State
-        data class Downloading(val id: Long): State
+        data class Downloading(val progress: Float): State
         data class Downloaded(val downloadable: Downloadable): State
         data class Error(val message: String): State
 
         @JvmStatic
         @Composable
-        fun Button(viewModel: MainViewModel, dm: DownloadManager, item: Downloadable) {
+        fun Button(viewModel: MainViewModel, item: Downloadable) {
             var status: State by remember {
                 mutableStateOf(
                     if (item.destination.exists()) Downloaded(item)
                     else Ready
                 )
             }
-            var progress by remember { mutableDoubleStateOf(0.0) }
+            var progress by remember { mutableFloatStateOf(0f) }
 
             val coroutineScope = rememberCoroutineScope()
-
-            suspend fun waitForDownload(result: Downloading, item: Downloadable): State {
-                while (true) {
-                    val cursor = dm.query(DownloadManager.Query().setFilterById(result.id))
-
-                    if (cursor == null) {
-                        Log.e(tag, "dm.query() returned null")
-                        return Error("dm.query() returned null")
-                    }
-
-                    if (!cursor.moveToFirst() || cursor.count < 1) {
-                        cursor.close()
-                        Log.i(tag, "cursor.moveToFirst() returned false or cursor.count < 1, download canceled?")
-                        return Ready
-                    }
-
-                    val pix = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                    val tix = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                    val sofar = cursor.getLongOrNull(pix) ?: 0
-                    val total = cursor.getLongOrNull(tix) ?: 1
-                    cursor.close()
-
-                    if (sofar == total) {
-                        // No need to set permissions for files in app-private storage
-                        // They already have the correct permissions by default
-                        Log.i(tag, "Download complete: ${item.destination.path}")
-                        return Downloaded(item)
-                    }
-
-                    progress = (sofar * 1.0) / total
-
-                    delay(1000L)
-                }
-            }
 
             fun onClick() {
                 when (val s = status) {
@@ -83,29 +50,67 @@ data class Downloadable(val name: String, val source: Uri, val destination: File
                     }
 
                     is Downloading -> {
-                        coroutineScope.launch {
-                            status = waitForDownload(s, item)
-                        }
+                        // Already downloading, do nothing
                     }
 
                     else -> {
-                        item.destination.delete()
-
-                        val request = DownloadManager.Request(item.source).apply {
-                            setTitle("Downloading model")
-                            setDescription("Downloading model: ${item.name}")
-                            setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
-                            setDestinationUri(item.destination.toUri())
-                            // Ensure destination directory exists
-                            item.destination.parentFile?.mkdirs()
+                        // Start download
+                        coroutineScope.launch(Dispatchers.IO) {
+                            status = Downloading(0f)
+                            
+                            try {
+                                // Ensure parent directories exist
+                                item.destination.parentFile?.mkdirs()
+                                
+                                val url = URL(item.source.toString())
+                                val connection = url.openConnection() as HttpURLConnection
+                                connection.connectTimeout = 30000
+                                connection.readTimeout = 30000
+                                connection.connect()
+                                
+                                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                                    withContext(Dispatchers.Main) {
+                                        status = Error("Server returned HTTP ${connection.responseCode}")
+                                    }
+                                    return@launch
+                                }
+                                
+                                val fileSize = connection.contentLength
+                                var downloadedSize = 0
+                                
+                                FileOutputStream(item.destination).use { output ->
+                                    connection.inputStream.use { input ->
+                                        val buffer = ByteArray(8192)
+                                        var bytesRead: Int
+                                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                                            output.write(buffer, 0, bytesRead)
+                                            downloadedSize += bytesRead
+                                            
+                                            // Update progress
+                                            if (fileSize > 0) {
+                                                val currentProgress = downloadedSize.toFloat() / fileSize
+                                                withContext(Dispatchers.Main) {
+                                                    progress = currentProgress
+                                                    status = Downloading(currentProgress)
+                                                }
+                                            }
+                                        }
+                                        output.flush()
+                                    }
+                                }
+                                
+                                withContext(Dispatchers.Main) {
+                                    viewModel.log("Download complete: ${item.destination.path}")
+                                    status = Downloaded(item)
+                                }
+                            } catch (e: Exception) {
+                                Log.e(tag, "Download failed", e)
+                                withContext(Dispatchers.Main) {
+                                    viewModel.log("Download failed: ${e.message}")
+                                    status = Error("Download failed: ${e.message}")
+                                }
+                            }
                         }
-
-                        viewModel.log("Saving ${item.name} to ${item.destination.path}")
-                        Log.i(tag, "Saving ${item.name} to ${item.destination.path}")
-
-                        val id = dm.enqueue(request)
-                        status = Downloading(id)
-                        onClick()
                     }
                 }
             }
@@ -119,6 +124,5 @@ data class Downloadable(val name: String, val source: Uri, val destination: File
                 }
             }
         }
-
     }
 }

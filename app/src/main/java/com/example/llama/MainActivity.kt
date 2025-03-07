@@ -108,7 +108,7 @@ class MainActivity(
 fun MainCompose(
     viewModel: MainViewModel,
     clipboard: ClipboardManager,
-    dm: DownloadManager,
+    dm: DownloadManager, // Keep this parameter even though we don't use it
     models: List<Downloadable>
 ) {
     Column {
@@ -143,7 +143,7 @@ fun MainCompose(
 
         Column {
             for (model in models) {
-                Downloadable.Button(viewModel, dm, model)
+                Downloadable.Button(viewModel, model)
             }
         }
     }
