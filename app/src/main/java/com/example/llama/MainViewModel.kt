@@ -26,6 +26,8 @@ class MainViewModel(
         If you're unsure about something, admit it rather than making assumptions.
         Remember the conversation context and respond appropriately to follow-up questions.
         Keep your responses concise but complete.
+        
+        Format your responses with single line breaks between paragraphs. Avoid using multiple consecutive line breaks.
 
         IMPORTANT: Only respond as the assistant. DO NOT generate user messages or continue the conversation beyond your response.
         Simply provide your response without any XML tags.
@@ -121,8 +123,7 @@ class MainViewModel(
 
 
         return buildString {
-//            append("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
-
+            // No BOS token - let llama.cpp add it automatically
             append("<|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
 
 //            if (relevantMemories.isNotEmpty()) {

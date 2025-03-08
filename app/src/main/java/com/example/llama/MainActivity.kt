@@ -12,20 +12,24 @@ import android.text.format.Formatter
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -105,6 +109,68 @@ class MainActivity(
 }
 
 @Composable
+fun UserMessage(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(12.dp)
+                .fillMaxWidth(0.8f)
+        )
+    }
+}
+
+@Composable
+fun AssistantMessage(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = text.replace("\n\n+".toRegex(), "\n\n").trim(),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .background(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(12.dp)
+                .fillMaxWidth(0.8f)
+        )
+    }
+}
+
+@Composable
+fun SystemMessage(text: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier.padding(4.dp)
+        )
+    }
+}
+
+@Composable
 fun MainCompose(
     viewModel: MainViewModel,
     clipboard: ClipboardManager,
@@ -116,12 +182,18 @@ fun MainCompose(
 
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(state = scrollState) {
-                items(viewModel.messages) {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyLarge.copy(color = LocalContentColor.current),
-                        modifier = Modifier.padding(2.dp)
-                    )
+                items(viewModel.messages) { message ->
+                    when {
+                        message.startsWith("User: ") -> {
+                            UserMessage(message.removePrefix("User: "))
+                        }
+                        message.startsWith("Assistant: ") -> {
+                            AssistantMessage(message.removePrefix("Assistant: "))
+                        }
+                        message.isNotEmpty() -> {
+                            SystemMessage(message)
+                        }
+                    }
                 }
             }
         }
