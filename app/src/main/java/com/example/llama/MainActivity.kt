@@ -119,6 +119,7 @@ fun UserMessage(text: String) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier
                 .background(
                     color = MaterialTheme.colorScheme.primaryContainer,
@@ -141,9 +142,10 @@ fun AssistantMessage(text: String) {
         Text(
             text = text.replace("\n\n+".toRegex(), "\n\n").trim(),
             style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
             modifier = Modifier
                 .background(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
                     shape = RoundedCornerShape(8.dp)
                 )
                 .padding(12.dp)
