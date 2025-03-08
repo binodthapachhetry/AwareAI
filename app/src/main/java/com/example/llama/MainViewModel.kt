@@ -122,7 +122,7 @@ class MainViewModel(
                         } else {
                             // More efficient update that doesn't recreate the entire list
                             val currentMessages = messages.toMutableList()
-                            currentMessages[currentMessages.lastIndex] = responseBuilder.toString()
+                            currentMessages[currentMessages.lastIndex] = "Assistant: $responseBuilder"
                             messages = currentMessages
                         }
                         currentResponse = "" // Reset current response after update
@@ -132,7 +132,7 @@ class MainViewModel(
             // Ensure final response is displayed
             if (currentResponse.isNotEmpty()) {
                 val currentMessages = messages.toMutableList()
-                currentMessages[currentMessages.lastIndex] = responseBuilder.toString()
+                currentMessages[currentMessages.lastIndex] = "Assistant: $responseBuilder"
                 messages = currentMessages
             }
 
