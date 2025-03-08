@@ -36,7 +36,7 @@ class LLamaAndroid {
         }
     }.asCoroutineDispatcher()
 
-    private val nlen: Int = 500 // Reduced from 1000 for faster initial response
+    private val nlen: Int = 400 // Further reduced for faster initial response
 
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
@@ -92,7 +92,7 @@ class LLamaAndroid {
         }
     }
 
-    // Add optimized model loading with thread configuration
+    // Optimized model loading with thread configuration
     private external fun load_model_with_config(
         filename: String,
         threads: Int,
@@ -108,19 +108,19 @@ class LLamaAndroid {
                     val availableProcessors = Runtime.getRuntime().availableProcessors()
                     val optimalThreads = maxOf(1, availableProcessors - 1) // Leave one core free
 
-                    // Use optimized loading if available, fall back to standard loading
-//                    val model = try {
-//                        load_model_with_config(
-//                            pathToModel,
-//                            threads = optimalThreads,
-//                            contextSize = 2048, // Smaller context size for faster inference
-//                            batchSize = 512
-//                        )
-//                    } catch (e: Exception) {
-//                        Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
-//                        load_model(pathToModel)
-//                    }
-                    val model = load_model(pathToModel)
+                    // Use optimized loading with configuration parameters
+                    val model = try {
+                        Log.i(tag, "Loading model with optimized config: threads=$optimalThreads, contextSize=2048, batchSize=512")
+                        load_model_with_config(
+                            pathToModel,
+                            threads = optimalThreads,
+                            contextSize = 2048, // Smaller context size for faster inference
+                            batchSize = 512
+                        )
+                    } catch (e: Exception) {
+                        Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
+                        load_model(pathToModel)
+                    }
 
                     if (model == 0L) throw IllegalStateException("load_model() failed")
 

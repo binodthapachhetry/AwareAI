@@ -59,10 +59,38 @@ class MainViewModel(
 
     // Helper function to find similar queries in cache
     private fun findSimilarQuery(query: String): String? {
-        // Simple implementation - exact match only for now
-        return responseCache.entries.firstOrNull {
-            it.key.lowercase().trim() == query.lowercase().trim()
-        }?.value
+        // Normalize the query
+        val normalizedQuery = query.lowercase().trim()
+        
+        // First try exact match
+        responseCache.entries.firstOrNull {
+            it.key.lowercase().trim() == normalizedQuery
+        }?.let { return it.value }
+        
+        // Then try fuzzy matching for short queries (more likely to have similar variants)
+        if (normalizedQuery.length < 20) {
+            responseCache.entries.firstOrNull {
+                val similarity = calculateSimilarity(it.key.lowercase().trim(), normalizedQuery)
+                similarity > 0.8 // 80% similarity threshold
+            }?.let { return it.value }
+        }
+        
+        return null
+    }
+    
+    // Simple string similarity calculation (Jaccard similarity)
+    private fun calculateSimilarity(s1: String, s2: String): Double {
+        if (s1 == s2) return 1.0
+        if (s1.isEmpty() || s2.isEmpty()) return 0.0
+        
+        // Create sets of words
+        val words1 = s1.split(Regex("\\s+")).toSet()
+        val words2 = s2.split(Regex("\\s+")).toSet()
+        
+        val intersection = words1.intersect(words2).size
+        val union = words1.union(words2).size
+        
+        return intersection.toDouble() / union.toDouble()
     }
 
     fun send() {
@@ -71,6 +99,23 @@ class MainViewModel(
 
         // Add user message to UI
         messages += "User: $text"
+
+        // Check cache for quick response
+        val cachedResponse = findSimilarQuery(text)
+        if (cachedResponse != null) {
+            // Use cached response for immediate feedback
+            messages += "Assistant: $cachedResponse"
+            
+            // Still add to session history
+            viewModelScope.launch {
+                val userMessage = createMessage(text, Message.SenderType.USER)
+                sessionManager.addMessage(userMessage)
+                
+                val aiMessage = createMessage(cachedResponse, Message.SenderType.AI)
+                sessionManager.addMessage(aiMessage)
+            }
+            return
+        }
 
         // Add typing indicator as a temporary message
         messages += "Assistant: ..." // Typing indicator
@@ -140,20 +185,32 @@ class MainViewModel(
             // Apply context window strategy with reduced context size
             when (contextConfig.strategy) {
                 ContextStrategy.SLIDING_WINDOW -> {
-                    session.messages
-                        .takeLast(10) // Reduced from contextConfig.nContext for faster processing
-                        .forEach { message ->
-                            when (message.sender) {
-                                Message.SenderType.USER -> append("<|start_header_id|>user<|end_header_id|>${message.text}<|eot_id|>")
-                                Message.SenderType.AI -> append("<|start_header_id|>assistant<|end_header_id|>${message.text}<|eot_id|>")
-                                else -> append("${message.sender}: ${message.text}")
+                    // Check cache for the last user message
+                    val lastUserMessage = session.messages.lastOrNull { it.sender == Message.SenderType.USER }?.text
+                    val cachedResponse = lastUserMessage?.let { findSimilarQuery(it) }
+                    
+                    if (cachedResponse != null) {
+                        // If we have a cached response, use minimal context
+                        Log.d(tag, "Using cached response for query")
+                        val lastMessage = session.messages.last()
+                        append("<|start_header_id|>user<|end_header_id|>${lastMessage.text}<|eot_id|>")
+                    } else {
+                        // Otherwise use normal (but still limited) context
+                        session.messages
+                            .takeLast(8) // Further reduced for faster processing
+                            .forEach { message ->
+                                when (message.sender) {
+                                    Message.SenderType.USER -> append("<|start_header_id|>user<|end_header_id|>${message.text}<|eot_id|>")
+                                    Message.SenderType.AI -> append("<|start_header_id|>assistant<|end_header_id|>${message.text}<|eot_id|>")
+                                    else -> append("${message.sender}: ${message.text}")
+                                }
                             }
-                        }
+                    }
                 }
                 ContextStrategy.SUMMARY -> {
                     // Implement summarization in the future
                     session.messages
-                        .takeLast(10) // Reduced from contextConfig.nContext for faster processing
+                        .takeLast(6) // Further reduced for faster processing
                         .forEach { message ->
                             when (message.sender) {
                                 Message.SenderType.USER -> append("User: ${message.text}\n")
