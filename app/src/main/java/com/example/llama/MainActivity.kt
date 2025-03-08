@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -110,12 +111,19 @@ class MainActivity(
 
 @Composable
 fun UserMessage(text: String) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
-        contentAlignment = Alignment.CenterEnd
+        horizontalAlignment = Alignment.End
     ) {
+        Text(
+            text = "You",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 4.dp, end = 8.dp)
+        )
+        
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
@@ -133,12 +141,19 @@ fun UserMessage(text: String) {
 
 @Composable
 fun AssistantMessage(text: String) {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
-        contentAlignment = Alignment.CenterStart
+        horizontalAlignment = Alignment.Start
     ) {
+        Text(
+            text = "Assistant",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(bottom = 4.dp, start = 8.dp)
+        )
+        
         Text(
             text = text.replace("\n\n+".toRegex(), "\n\n").trim(),
             style = MaterialTheme.typography.bodyLarge,
