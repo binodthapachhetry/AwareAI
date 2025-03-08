@@ -26,7 +26,7 @@ class MainViewModel(
         If you're unsure about something, admit it rather than making assumptions.
         Remember the conversation context and respond appropriately to follow-up questions.
         Keep your responses concise but complete.
-        
+
         Format your responses with single line breaks between paragraphs. Avoid using multiple consecutive line breaks.
 
         IMPORTANT: Only respond as the assistant. DO NOT generate user messages or continue the conversation beyond your response.
@@ -34,7 +34,7 @@ class MainViewModel(
     """.trimIndent()
 
     // UI state
-    var messages by mutableStateOf(listOf("Initializing..."))
+    var messages by mutableStateOf(listOf<String>())
         private set
 
     var message by mutableStateOf("")

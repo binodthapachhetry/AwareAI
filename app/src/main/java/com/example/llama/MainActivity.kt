@@ -167,15 +167,15 @@ fun SystemMessage(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(4.dp),
-        contentAlignment = Alignment.Center
+            .padding(2.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             ),
-            modifier = Modifier.padding(4.dp)
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) // Reduced padding
         )
     }
 }
