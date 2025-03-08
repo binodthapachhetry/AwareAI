@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +45,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -156,6 +159,45 @@ fun UserMessage(text: String) {
 }
 
 @Composable
+fun TypingIndicator() {
+    val dots = remember { mutableStateOf(1) }
+    
+    // Animate the dots
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(500) // Change dots every 500ms
+            dots.value = (dots.value % 3) + 1
+        }
+    }
+    
+    Row(
+        modifier = Modifier
+            .background(
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Animated dots
+        repeat(3) { index ->
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(
+                        color = if (index < dots.value) 
+                            MaterialTheme.colorScheme.onTertiaryContainer 
+                        else 
+                            MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.3f),
+                        shape = CircleShape
+                    )
+            )
+        }
+    }
+}
+
+@Composable
 fun AssistantMessage(text: String) {
     Column(
         modifier = Modifier
@@ -170,18 +212,23 @@ fun AssistantMessage(text: String) {
             modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
         )
 
-        Text(
-            text = text.replace("\n\n+".toRegex(), "\n\n").trim(),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-            modifier = Modifier
-                .background(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    shape = RoundedCornerShape(4.dp)
-                )
-                .padding(6.dp)
-                .fillMaxWidth(0.8f)
-        )
+        if (text == "...") {
+            // Show animated typing indicator instead of "..."
+            TypingIndicator()
+        } else {
+            Text(
+                text = text.replace("\n\n+".toRegex(), "\n\n").trim(),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier
+                    .background(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(6.dp)
+                    .fillMaxWidth(0.8f)
+            )
+        }
     }
 }
 
