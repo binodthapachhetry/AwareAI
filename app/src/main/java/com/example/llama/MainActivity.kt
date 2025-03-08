@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
@@ -37,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
@@ -195,10 +197,22 @@ fun MainCompose(
 ) {
     Column {
         val scrollState = rememberLazyListState()
+        
+        // Auto-scroll to the bottom (which is actually the first item since we're using reverseLayout)
+        LaunchedEffect(viewModel.messages.size) {
+            if (viewModel.messages.isNotEmpty()) {
+                scrollState.animateScrollToItem(0)
+            }
+        }
 
         Box(modifier = Modifier.weight(1f)) {
-            LazyColumn(state = scrollState) {
-                items(viewModel.messages) { message ->
+            LazyColumn(
+                state = scrollState,
+                reverseLayout = true, // Reverse the layout so newest items are at the bottom
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Reverse the messages list so the newest messages appear at the bottom
+                items(viewModel.messages.reversed()) { message ->
                     when {
                         message.startsWith("User: ") -> {
                             UserMessage(message.removePrefix("User: "))
@@ -214,37 +228,27 @@ fun MainCompose(
             }
         }
         
-        // Utility buttons in a row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            Button({ viewModel.bench(8, 4, 1) }) { Text("Bench") }
-            Button({ viewModel.clear() }) { Text("Clear") }
-            Button({
-                viewModel.messages.joinToString("\n").let {
-                    clipboard.setPrimaryClip(ClipData.newPlainText("", it))
-                }
-            }) { Text("Copy") }
-        }
+        // Removed utility buttons (bench, clear, copy)
         
-        // Text field with floating send button
-        Box(modifier = Modifier.fillMaxWidth()) {
+        // Text field with send button side by side with comparable heights
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             OutlinedTextField(
                 value = viewModel.message,
                 onValueChange = { viewModel.updateMessage(it) },
                 label = { Text("Message") },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(end = 48.dp) // Make room for the button
+                    .weight(1f)
+                    .padding(end = 8.dp)
             )
             
-            FloatingActionButton(
+            Button(
                 onClick = { viewModel.send() },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 8.dp)
-                    .size(40.dp)
+                modifier = Modifier.height(56.dp) // Match the typical height of OutlinedTextField
             ) {
                 Icon(
                     imageVector = Icons.Default.Send,
