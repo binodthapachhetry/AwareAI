@@ -427,7 +427,7 @@ Java_android_llama_cpp_LLamaAndroid_completion_1loop(
     jstring new_token = nullptr;
     if (is_valid_utf8(cached_token_chars.c_str())) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("cached: %s, new_token_chars: `%s`, id: %d", cached_token_chars.c_str(), new_token_chars.c_str(), new_token_id);
+//        LOGi("cached: %s, new_token_chars: `%s`, id: %d", cached_token_chars.c_str(), new_token_chars.c_str(), new_token_id);
         cached_token_chars.clear();
     } else {
         new_token = env->NewStringUTF("");

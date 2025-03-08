@@ -30,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -76,12 +75,6 @@ class MainActivity(
         // Use app-private storage for model files
         val models = listOf(
 
-//            Downloadable(
-//                "Llama3.2 3B (int4, 2.0 GiB)",
-//                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf?download=true"),
-//                File(filesDir, "Llama-3.2-3B-Instruct-Q4_K_M.gguf"),
-//            ),
-
             Downloadable(
                 "Llama3.2 1B (int4, 808 MB)",
                 Uri.parse("https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf?download=true"),
@@ -114,16 +107,16 @@ fun UserMessage(text: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(4.dp),
         horizontalAlignment = Alignment.End
     ) {
         Text(
             text = "You",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp, end = 8.dp)
+            modifier = Modifier.padding(bottom = 2.dp, end = 4.dp)
         )
-        
+
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
@@ -131,9 +124,9 @@ fun UserMessage(text: String) {
             modifier = Modifier
                 .background(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(4.dp)
                 )
-                .padding(12.dp)
+                .padding(6.dp)
                 .fillMaxWidth(0.8f)
         )
     }
@@ -144,16 +137,16 @@ fun AssistantMessage(text: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            .padding(4.dp),
         horizontalAlignment = Alignment.Start
     ) {
         Text(
             text = "Assistant",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.padding(bottom = 4.dp, start = 8.dp)
+            modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
         )
-        
+
         Text(
             text = text.replace("\n\n+".toRegex(), "\n\n").trim(),
             style = MaterialTheme.typography.bodyLarge,
@@ -161,9 +154,9 @@ fun AssistantMessage(text: String) {
             modifier = Modifier
                 .background(
                     color = MaterialTheme.colorScheme.tertiaryContainer,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(4.dp)
                 )
-                .padding(12.dp)
+                .padding(6.dp)
                 .fillMaxWidth(0.8f)
         )
     }
