@@ -91,7 +91,13 @@ class MainActivity(
 
         // Use app-private storage for model files
         val models = listOf(
-
+            // More aggressively quantized model for faster inference
+            Downloadable(
+                "Llama3.2 1B (int3, 600 MB)",
+                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q3_K_M.gguf?download=true"),
+                File(filesDir, "Llama-3.2-1B-Instruct-Q3_K_M.gguf"),
+            ),
+            
             Downloadable(
                 "Llama3.2 1B (int4, 808 MB)",
                 Uri.parse("https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf?download=true"),

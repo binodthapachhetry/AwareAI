@@ -16,6 +16,9 @@ class MainViewModel(
     private val memoryManager: MemoryManager = MemoryManager(),
     private val contextConfig: ContextConfig = ContextConfig()
 ) : ViewModel() {
+    
+    // Add a response cache for common queries
+    private val responseCache = mutableMapOf<String, String>()
 
     private val tag: String? = this::class.simpleName
 
@@ -53,17 +56,44 @@ class MainViewModel(
     }
 
 
+    // Track last UI update time for throttling
+    private var lastUpdateTime = 0L
+    
+    // Helper function to determine when to update UI
+    private fun shouldUpdateUI(response: String): Boolean {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastUpdateTime > 50) { // Update at most every 50ms
+            lastUpdateTime = currentTime
+            return true
+        }
+        // Also update on sentence boundaries for more responsive feel
+        return response.contains(". ") || response.contains("? ") || response.contains("! ")
+    }
+    
+    // Helper function to find similar queries in cache
+    private fun findSimilarQuery(query: String): String? {
+        // Simple implementation - exact match only for now
+        return responseCache.entries.firstOrNull { 
+            it.key.lowercase().trim() == query.lowercase().trim() 
+        }?.value
+    }
+    
     fun send() {
         val text = message
         message = ""
-
-//        Log.d(tag, "send() text: $text")
+        
+        // Check cache for similar queries
+        val cachedResponse = findSimilarQuery(text)
+        if (cachedResponse != null) {
+            // Use cached response for immediate feedback
+            messages += "User: $text"
+            messages += "Assistant: $cachedResponse"
+            return
+        }
 
         // Add to messages console for UI
         messages += "User: $text"
         messages += ""  // Empty string for AI response placeholder
-
-//        Log.d(tag, "send() messages: $messages")
 
         viewModelScope.launch {
             // Create and add user message to session
@@ -73,64 +103,65 @@ class MainViewModel(
             // Prepare context with history and relevant memories
             val context = prepareContext()
 
-            Log.d(tag, "send() context to the LLM: $context")
-
             // Variables to track the complete response
             val responseBuilder = StringBuilder()
-            var tempAiMessage: Message? = null
+            var currentResponse = ""
 
             // Only update UI during streaming, don't modify session
             llamaAndroid.send(context, formatChat = true)
                 .catch { /* error handling */ }
                 .collect { response ->
                     responseBuilder.append(response)
-
-                    // Update UI only, don't modify session
-                    if (messages.last().isEmpty()) {
-                        messages = messages.dropLast(1) + "Assistant: $response"
-                    } else {
-                        messages = messages.dropLast(1) + (messages.last() + response)
+                    currentResponse += response
+                    
+                    // Update UI less frequently for better performance
+                    if (shouldUpdateUI(currentResponse)) {
+                        // Update UI only, don't modify session
+                        if (messages.last().isEmpty()) {
+                            messages = messages.dropLast(1) + "Assistant: $responseBuilder"
+                        } else {
+                            // More efficient update that doesn't recreate the entire list
+                            val currentMessages = messages.toMutableList()
+                            currentMessages[currentMessages.lastIndex] = responseBuilder.toString()
+                            messages = currentMessages
+                        }
+                        currentResponse = "" // Reset current response after update
                     }
-
                 }
+
+            // Ensure final response is displayed
+            if (currentResponse.isNotEmpty()) {
+                val currentMessages = messages.toMutableList()
+                currentMessages[currentMessages.lastIndex] = responseBuilder.toString()
+                messages = currentMessages
+            }
 
             val userTagIndex = responseBuilder.toString().indexOf("User:")
             if (userTagIndex > 0) {
                 val finalAiMessage = createMessage(responseBuilder.toString().substring(0, userTagIndex).trim(), Message.SenderType.AI)
                 sessionManager.addMessage(finalAiMessage)
-//                Log.d(tag, "send() created final message: ${finalAiMessage.text}")
                 updateMemory(finalAiMessage)
-            }else{
+            } else {
                 val finalAiMessage = createMessage(responseBuilder.toString(), Message.SenderType.AI)
                 sessionManager.addMessage(finalAiMessage)
-//                Log.d(tag, "send() created final message: ${finalAiMessage.text}")
                 updateMemory(finalAiMessage)
             }
-
         }
     }
 
     private suspend fun prepareContext(): String {
         val session = sessionManager.requireActiveSession()
-        val relevantMemories = if (session.messages.isNotEmpty()) {
-            memoryManager.getRelatedMemories(
-                session.messages.last().text,
-                session.id
-            )
-        } else {
-            emptyList()
-        }
-
-
+        // Removed relevantMemories lookup to reduce latency
+        
         return buildString {
             // No BOS token - let llama.cpp add it automatically
             append("<|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
 
-            // Apply context window strategy
+            // Apply context window strategy with reduced context size
             when (contextConfig.strategy) {
                 ContextStrategy.SLIDING_WINDOW -> {
                     session.messages
-                        .takeLast(contextConfig.nContext)
+                        .takeLast(10) // Reduced from contextConfig.nContext for faster processing
                         .forEach { message ->
                             when (message.sender) {
                                 Message.SenderType.USER -> append("<|start_header_id|>user<|end_header_id|>${message.text}<|eot_id|>")
@@ -142,7 +173,7 @@ class MainViewModel(
                 ContextStrategy.SUMMARY -> {
                     // Implement summarization in the future
                     session.messages
-                        .takeLast(contextConfig.nContext)
+                        .takeLast(10) // Reduced from contextConfig.nContext for faster processing
                         .forEach { message ->
                             when (message.sender) {
                                 Message.SenderType.USER -> append("User: ${message.text}\n")

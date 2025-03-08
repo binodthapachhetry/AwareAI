@@ -36,7 +36,7 @@ class LLamaAndroid {
         }
     }.asCoroutineDispatcher()
 
-    private val nlen: Int = 1000
+    private val nlen: Int = 500 // Reduced from 1000 for faster initial response
 
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
@@ -102,7 +102,7 @@ class LLamaAndroid {
                     val context = new_context(model)
                     if (context == 0L) throw IllegalStateException("new_context() failed")
 
-                    val batch = new_batch(2048, 0, 1)
+                    val batch = new_batch(4096, 0, 1) // Increased batch size for more efficient processing
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
                     val sampler = new_sampler()
@@ -117,22 +117,32 @@ class LLamaAndroid {
     }
 
     fun send(context: String, formatChat: Boolean = false): Flow<String> = flow {
-
         when (val state = threadLocalState.get()) {
-
             is State.Loaded -> {
                 val ncur = IntVar(completion_init(state.context, state.batch, context, formatChat, nlen))
                 Log.d(tag, "ncur: ${ncur.value.toString()}")
                 Log.d(tag, "nlen: ${nlen.toString()}")
 
+                var accumulatedText = ""
                 while (ncur.value <= nlen) {
                     val str = completion_loop(state.context, state.batch, state.sampler, nlen, ncur)
                     if (str == null) {
                         break
                     }
-                    emit(str)
+                    
+                    accumulatedText += str
+                    // Emit more frequently on sentence boundaries or when we have enough text
+                    if (accumulatedText.contains(". ") || accumulatedText.contains("? ") || 
+                        accumulatedText.contains("! ") || accumulatedText.length > 20) {
+                        emit(accumulatedText)
+                        accumulatedText = ""
+                    }
                 }
-//                kv_cache_clear(state.context)
+                
+                // Emit any remaining text
+                if (accumulatedText.isNotEmpty()) {
+                    emit(accumulatedText)
+                }
             }
             else -> {}
         }
