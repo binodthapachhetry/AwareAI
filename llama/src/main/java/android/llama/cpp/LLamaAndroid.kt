@@ -94,12 +94,12 @@ class LLamaAndroid {
 
     // Add optimized model loading with thread configuration
     private external fun load_model_with_config(
-        filename: String, 
+        filename: String,
         threads: Int,
         contextSize: Int,
         batchSize: Int
     ): Long
-    
+
     suspend fun load(pathToModel: String) {
         withContext(runLoop) {
             when (threadLocalState.get()) {
@@ -107,20 +107,21 @@ class LLamaAndroid {
                     // Get available processors for optimal threading
                     val availableProcessors = Runtime.getRuntime().availableProcessors()
                     val optimalThreads = maxOf(1, availableProcessors - 1) // Leave one core free
-                    
+
                     // Use optimized loading if available, fall back to standard loading
-                    val model = try {
-                        load_model_with_config(
-                            pathToModel,
-                            threads = optimalThreads,
-                            contextSize = 2048, // Smaller context size for faster inference
-                            batchSize = 512
-                        )
-                    } catch (e: Exception) {
-                        Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
-                        load_model(pathToModel)
-                    }
-                    
+//                    val model = try {
+//                        load_model_with_config(
+//                            pathToModel,
+//                            threads = optimalThreads,
+//                            contextSize = 2048, // Smaller context size for faster inference
+//                            batchSize = 512
+//                        )
+//                    } catch (e: Exception) {
+//                        Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
+//                        load_model(pathToModel)
+//                    }
+                    val model = load_model(pathToModel)
+
                     if (model == 0L) throw IllegalStateException("load_model() failed")
 
                     val context = new_context(model)
@@ -153,16 +154,16 @@ class LLamaAndroid {
                     if (str == null) {
                         break
                     }
-                    
+
                     accumulatedText += str
                     // Emit more frequently on sentence boundaries or when we have enough text
-                    if (accumulatedText.contains(". ") || accumulatedText.contains("? ") || 
+                    if (accumulatedText.contains(". ") || accumulatedText.contains("? ") ||
                         accumulatedText.contains("! ") || accumulatedText.length > 20) {
                         emit(accumulatedText)
                         accumulatedText = ""
                     }
                 }
-                
+
                 // Emit any remaining text
                 if (accumulatedText.isNotEmpty()) {
                     emit(accumulatedText)
