@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -198,21 +199,22 @@ fun MainCompose(
     Column {
         val scrollState = rememberLazyListState()
         
-        // Auto-scroll to the bottom (which is actually the first item since we're using reverseLayout)
+        // Auto-scroll to the bottom when new messages arrive
         LaunchedEffect(viewModel.messages.size) {
             if (viewModel.messages.isNotEmpty()) {
-                scrollState.animateScrollToItem(0)
+                // Scroll to the last item (most recent message)
+                scrollState.animateScrollToItem(viewModel.messages.size - 1)
             }
         }
 
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = scrollState,
-                reverseLayout = true, // Reverse the layout so newest items are at the bottom
+                reverseLayout = false, // Change to false
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Reverse the messages list so the newest messages appear at the bottom
-                items(viewModel.messages.reversed()) { message ->
+                // Don't reverse the messages list
+                items(viewModel.messages) { message ->
                     when {
                         message.startsWith("User: ") -> {
                             UserMessage(message.removePrefix("User: "))
@@ -224,6 +226,11 @@ fun MainCompose(
                             SystemMessage(message)
                         }
                     }
+                }
+                
+                // Add spacer at the end to push content up from the bottom
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
