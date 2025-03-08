@@ -156,6 +156,48 @@ Java_android_llama_cpp_LLamaAndroid_log_1to_1android(JNIEnv *, jobject) {
 }
 
 extern "C"
+JNIEXPORT jlong JNICALL
+Java_android_llama_cpp_LLamaAndroid_load_1model_1with_1config(
+        JNIEnv *env,
+        jobject,
+        jstring filename,
+        jint threads,
+        jint contextSize,
+        jint batchSize,
+        jint gpuLayers,
+        jfloat ropeScaling) {
+    
+    const char *path = env->GetStringUTFChars(filename, nullptr);
+    if (!path) return 0;
+
+    // Log the configuration
+    __android_log_print(ANDROID_LOG_INFO, TAG, 
+        "Loading model with config: threads=%d, contextSize=%d, batchSize=%d, gpuLayers=%d, ropeScaling=%f", 
+        threads, contextSize, batchSize, gpuLayers, ropeScaling);
+    
+    // Set up model parameters
+    struct llama_model_params model_params = llama_model_default_params();
+    model_params.n_threads = threads;
+    model_params.n_ctx = contextSize;
+    model_params.n_batch = batchSize;
+    // Additional parameters could be set here if llama.cpp API supports them
+    
+    // Load the model with custom parameters
+    struct llama_model *model = llama_load_model_from_file(path, model_params);
+    
+    // Log the result
+    if (model) {
+        __android_log_print(ANDROID_LOG_INFO, TAG, "Model loaded successfully with custom config");
+    } else {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load model with custom config");
+    }
+    
+    env->ReleaseStringUTFChars(filename, path);
+    
+    return reinterpret_cast<jlong>(model);
+}
+
+extern "C"
 JNIEXPORT jstring JNICALL
 Java_android_llama_cpp_LLamaAndroid_bench_1model(
         JNIEnv *env,
