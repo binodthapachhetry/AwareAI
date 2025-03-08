@@ -183,7 +183,7 @@ Java_android_llama_cpp_LLamaAndroid_load_1model_1with_1config(
     // Additional parameters could be set here if llama.cpp API supports them
     
     // Load the model with custom parameters
-    struct llama_model *model = llama_load_model_from_file(path, model_params);
+    struct llama_model *model = llama_model_load_from_file(path, model_params);
     
     // Log the result
     if (model) {
