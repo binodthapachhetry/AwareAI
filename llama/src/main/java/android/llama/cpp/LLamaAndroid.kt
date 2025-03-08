@@ -97,7 +97,9 @@ class LLamaAndroid {
         filename: String,
         threads: Int,
         contextSize: Int,
-        batchSize: Int
+        batchSize: Int,
+        gpuLayers: Int = 0,
+        ropeScaling: Float = 1.0f
     ): Long
 
     suspend fun load(pathToModel: String) {
@@ -108,14 +110,35 @@ class LLamaAndroid {
                     val availableProcessors = Runtime.getRuntime().availableProcessors()
                     val optimalThreads = maxOf(1, availableProcessors - 1) // Leave one core free
 
+                    // Calculate optimal parameters based on device capabilities
+                    val availableMemoryMB = Runtime.getRuntime().maxMemory() / (1024 * 1024)
+                    
+                    // Adjust context size based on available memory
+                    val contextSize = when {
+                        availableMemoryMB > 3000 -> 4096  // High memory devices
+                        availableMemoryMB > 1500 -> 2048  // Medium memory devices
+                        else -> 1024                      // Low memory devices
+                    }
+                    
+                    // Adjust batch size based on available memory
+                    val batchSize = when {
+                        availableMemoryMB > 3000 -> 1024  // High memory devices
+                        availableMemoryMB > 1500 -> 512   // Medium memory devices
+                        else -> 256                       // Low memory devices
+                    }
+                    
+                    Log.i(tag, "Device memory: ${availableMemoryMB}MB, using contextSize=$contextSize, batchSize=$batchSize")
+                    
                     // Use optimized loading with configuration parameters
                     val model = try {
-                        Log.i(tag, "Loading model with optimized config: threads=$optimalThreads, contextSize=2048, batchSize=512")
+                        Log.i(tag, "Loading model with optimized config: threads=$optimalThreads, contextSize=$contextSize, batchSize=$batchSize")
                         load_model_with_config(
                             pathToModel,
                             threads = optimalThreads,
-                            contextSize = 2048, // Smaller context size for faster inference
-                            batchSize = 512
+                            contextSize = contextSize,
+                            batchSize = batchSize,
+                            gpuLayers = 0,  // No GPU acceleration by default
+                            ropeScaling = 1.0f
                         )
                     } catch (e: Exception) {
                         Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
