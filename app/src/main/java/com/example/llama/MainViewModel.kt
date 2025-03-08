@@ -137,15 +137,18 @@ class MainViewModel(
             }
 
             val userTagIndex = responseBuilder.toString().indexOf("User:")
-            if (userTagIndex > 0) {
-                val finalAiMessage = createMessage(responseBuilder.toString().substring(0, userTagIndex).trim(), Message.SenderType.AI)
-                sessionManager.addMessage(finalAiMessage)
-                updateMemory(finalAiMessage)
+            val finalResponseText = if (userTagIndex > 0) {
+                responseBuilder.toString().substring(0, userTagIndex).trim()
             } else {
-                val finalAiMessage = createMessage(responseBuilder.toString(), Message.SenderType.AI)
-                sessionManager.addMessage(finalAiMessage)
-                updateMemory(finalAiMessage)
+                responseBuilder.toString()
             }
+            
+            // Add to cache for future use
+            responseCache[text] = finalResponseText
+            
+            val finalAiMessage = createMessage(finalResponseText, Message.SenderType.AI)
+            sessionManager.addMessage(finalAiMessage)
+            updateMemory(finalAiMessage)
         }
     }
 

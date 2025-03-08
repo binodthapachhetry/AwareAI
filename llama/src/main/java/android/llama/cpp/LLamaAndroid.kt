@@ -92,23 +92,47 @@ class LLamaAndroid {
         }
     }
 
+    // Add optimized model loading with thread configuration
+    private external fun load_model_with_config(
+        filename: String, 
+        threads: Int,
+        contextSize: Int,
+        batchSize: Int
+    ): Long
+    
     suspend fun load(pathToModel: String) {
         withContext(runLoop) {
             when (threadLocalState.get()) {
                 is State.Idle -> {
-                    val model = load_model(pathToModel)
-                    if (model == 0L)  throw IllegalStateException("load_model() failed")
+                    // Get available processors for optimal threading
+                    val availableProcessors = Runtime.getRuntime().availableProcessors()
+                    val optimalThreads = maxOf(1, availableProcessors - 1) // Leave one core free
+                    
+                    // Use optimized loading if available, fall back to standard loading
+                    val model = try {
+                        load_model_with_config(
+                            pathToModel,
+                            threads = optimalThreads,
+                            contextSize = 2048, // Smaller context size for faster inference
+                            batchSize = 512
+                        )
+                    } catch (e: Exception) {
+                        Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
+                        load_model(pathToModel)
+                    }
+                    
+                    if (model == 0L) throw IllegalStateException("load_model() failed")
 
                     val context = new_context(model)
                     if (context == 0L) throw IllegalStateException("new_context() failed")
 
-                    val batch = new_batch(4096, 0, 1) // Increased batch size for more efficient processing
+                    val batch = new_batch(4096, 0, 1) // Increased batch size
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
                     val sampler = new_sampler()
                     if (sampler == 0L) throw IllegalStateException("new_sampler() failed")
 
-                    Log.i(tag, "Loaded model $pathToModel")
+                    Log.i(tag, "Loaded model $pathToModel with ${optimalThreads} threads")
                     threadLocalState.set(State.Loaded(model, context, batch, sampler))
                 }
                 else -> throw IllegalStateException("Model already loaded")
