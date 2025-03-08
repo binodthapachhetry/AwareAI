@@ -41,7 +41,7 @@ class LLamaAndroid {
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
     private external fun free_model(model: Long)
-    private external fun new_context(model: Long): Long
+    private external fun new_context(model: Long, threads: Int = 0, contextSize: Int = 0, batchSize: Int = 0): Long
     private external fun free_context(context: Long)
     private external fun backend_init(numa: Boolean)
     private external fun backend_free()
@@ -129,25 +129,18 @@ class LLamaAndroid {
                     
                     Log.i(tag, "Device memory: ${availableMemoryMB}MB, using contextSize=$contextSize, batchSize=$batchSize")
                     
-                    // Use optimized loading with configuration parameters
-                    val model = try {
-                        Log.i(tag, "Loading model with optimized config: threads=$optimalThreads, contextSize=$contextSize, batchSize=$batchSize")
-                        load_model_with_config(
-                            pathToModel,
-                            threads = optimalThreads,
-                            contextSize = contextSize,
-                            batchSize = batchSize,
-                            gpuLayers = 0,  // No GPU acceleration by default
-                            ropeScaling = 1.0f
-                        )
-                    } catch (e: Exception) {
-                        Log.w(tag, "Optimized loading failed, falling back to standard loading", e)
-                        load_model(pathToModel)
-                    }
-
+                    // Load the model with standard loading
+                    val model = load_model(pathToModel)
                     if (model == 0L) throw IllegalStateException("load_model() failed")
 
-                    val context = new_context(model)
+                    // Apply optimization parameters when creating the context
+                    Log.i(tag, "Creating context with optimized parameters: threads=$optimalThreads, contextSize=$contextSize, batchSize=$batchSize")
+                    val context = new_context(
+                        model, 
+                        threads = optimalThreads,
+                        contextSize = contextSize,
+                        batchSize = batchSize
+                    )
                     if (context == 0L) throw IllegalStateException("new_context() failed")
 
                     val batch = new_batch(4096, 0, 1) // Increased batch size
