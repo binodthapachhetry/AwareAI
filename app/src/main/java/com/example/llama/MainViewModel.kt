@@ -16,7 +16,7 @@ class MainViewModel(
     private val memoryManager: MemoryManager = MemoryManager(),
     private val contextConfig: ContextConfig = ContextConfig()
 ) : ViewModel() {
-    
+
     // Add a response cache for common queries
     private val responseCache = mutableMapOf<String, String>()
 
@@ -56,32 +56,25 @@ class MainViewModel(
     }
 
 
-    
+
     // Helper function to find similar queries in cache
     private fun findSimilarQuery(query: String): String? {
         // Simple implementation - exact match only for now
-        return responseCache.entries.firstOrNull { 
-            it.key.lowercase().trim() == query.lowercase().trim() 
+        return responseCache.entries.firstOrNull {
+            it.key.lowercase().trim() == query.lowercase().trim()
         }?.value
     }
-    
+
     fun send() {
         val text = message
         message = ""
-        
-        // Check cache for similar queries
-        val cachedResponse = findSimilarQuery(text)
-        if (cachedResponse != null) {
-            // Use cached response for immediate feedback
-            messages += "User: $text"
-            messages += "Assistant: $cachedResponse"
-            return
-        }
 
-        // Add to messages console for UI
+        // Add user message to UI
         messages += "User: $text"
-        messages += "Assistant: "  // Start with "Assistant: " prefix
-        
+
+        // Add typing indicator as a temporary message
+        messages += "Assistant: ..." // Typing indicator
+
         viewModelScope.launch {
             // Create and add user message to session
             val userMessage = createMessage(text, Message.SenderType.USER)
@@ -92,30 +85,30 @@ class MainViewModel(
 
             // Variables to track the complete response
             val responseBuilder = StringBuilder()
+            var firstChunkReceived = false
 
             // Stream the response with immediate updates
             llamaAndroid.send(context, formatChat = true)
-                .catch { e -> 
+                .catch { e ->
                     Log.e(tag, "Error generating response", e)
                     messages = messages.dropLast(1) + "Assistant: Error: ${e.message}"
                 }
                 .collect { response ->
                     responseBuilder.append(response)
-                    
-                    // Update UI immediately with each token
+
+                    // Update UI with the response
                     val currentMessages = messages.toMutableList()
-                    
-                    // The last message should already start with "Assistant: "
-                    if (currentMessages.last().startsWith("Assistant: ")) {
-                        // Append to the existing message
-                        currentMessages[currentMessages.lastIndex] = 
-                            currentMessages.last() + response
+
+                    if (!firstChunkReceived) {
+                        // Replace typing indicator with first chunk of actual response
+                        currentMessages[currentMessages.lastIndex] = "Assistant: " + response
+                        firstChunkReceived = true
                     } else {
-                        // This shouldn't happen, but just in case
-                        currentMessages[currentMessages.lastIndex] = 
-                            "Assistant: " + responseBuilder.toString()
+                        // Append to the existing message
+                        currentMessages[currentMessages.lastIndex] =
+                            currentMessages.last() + response
                     }
-                    
+
                     messages = currentMessages
                 }
 
@@ -126,10 +119,10 @@ class MainViewModel(
             } else {
                 responseBuilder.toString()
             }
-            
+
             // Add to cache for future use
             responseCache[text] = finalResponseText
-            
+
             val finalAiMessage = createMessage(finalResponseText, Message.SenderType.AI)
             sessionManager.addMessage(finalAiMessage)
             updateMemory(finalAiMessage)
@@ -139,7 +132,7 @@ class MainViewModel(
     private suspend fun prepareContext(): String {
         val session = sessionManager.requireActiveSession()
         // Removed relevantMemories lookup to reduce latency
-        
+
         return buildString {
             // No BOS token - let llama.cpp add it automatically
             append("<|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
