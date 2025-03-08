@@ -13,18 +13,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -167,15 +173,15 @@ fun SystemMessage(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(2.dp),
-        contentAlignment = Alignment.CenterStart
+            .padding(vertical = 2.dp), // Reduced vertical padding
+        contentAlignment = Alignment.CenterStart // Already left-aligned
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             ),
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp) // Reduced padding
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp) // Adjusted padding
         )
     }
 }
@@ -207,13 +213,12 @@ fun MainCompose(
                 }
             }
         }
-        OutlinedTextField(
-            value = viewModel.message,
-            onValueChange = { viewModel.updateMessage(it) },
-            label = { Text("Message") },
-        )
-        Row {
-            Button({ viewModel.send() }) { Text("Send") }
+        
+        // Utility buttons in a row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
             Button({ viewModel.bench(8, 4, 1) }) { Text("Bench") }
             Button({ viewModel.clear() }) { Text("Clear") }
             Button({
@@ -221,6 +226,31 @@ fun MainCompose(
                     clipboard.setPrimaryClip(ClipData.newPlainText("", it))
                 }
             }) { Text("Copy") }
+        }
+        
+        // Text field with floating send button
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = viewModel.message,
+                onValueChange = { viewModel.updateMessage(it) },
+                label = { Text("Message") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 48.dp) // Make room for the button
+            )
+            
+            FloatingActionButton(
+                onClick = { viewModel.send() },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 8.dp)
+                    .size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send"
+                )
+            }
         }
 
         Column {
