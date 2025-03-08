@@ -182,19 +182,18 @@ Java_android_llama_cpp_LLamaAndroid_load_1model_1with_1config(
     
     // Set up model parameters
     struct llama_model_params model_params = llama_model_default_params();
-    model_params.n_threads = threads;
-    model_params.n_ctx = contextSize;
-    model_params.n_batch = batchSize;
-    // Additional parameters could be set here if llama.cpp API supports them
+    // The llama_model_params struct doesn't have n_threads, n_ctx, or n_batch
+    // These parameters are part of llama_context_params instead
     
-    // Load the model with custom parameters
+    // Load the model with default parameters
     struct llama_model *model = llama_model_load_from_file(path, model_params);
     
     // Log the result
     if (model) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, "Model loaded successfully with custom config");
+        __android_log_print(ANDROID_LOG_INFO, TAG, "Model loaded successfully with default config");
+        // The configuration will be applied when creating the context
     } else {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load model with custom config");
+        __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to load model with default config");
     }
     
     env->ReleaseStringUTFChars(filename, path);
