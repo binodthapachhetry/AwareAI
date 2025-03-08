@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
@@ -36,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -196,77 +199,84 @@ fun MainCompose(
     dm: DownloadManager, // Keep this parameter even though we don't use it
     models: List<Downloadable>
 ) {
-    Column {
-        val scrollState = rememberLazyListState()
-        
-        // Auto-scroll to the bottom when new messages arrive
-        LaunchedEffect(viewModel.messages.size) {
-            if (viewModel.messages.isNotEmpty()) {
-                // Scroll to the last item (most recent message)
-                scrollState.animateScrollToItem(viewModel.messages.size - 1)
-            }
+    val scrollState = rememberLazyListState()
+    
+    // Auto-scroll to the bottom when new messages arrive
+    LaunchedEffect(viewModel.messages.size) {
+        if (viewModel.messages.isNotEmpty()) {
+            scrollState.animateScrollToItem(viewModel.messages.size - 1)
         }
+    }
 
-        Box(modifier = Modifier.weight(1f)) {
-            LazyColumn(
-                state = scrollState,
-                reverseLayout = false, // Change to false
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Don't reverse the messages list
-                items(viewModel.messages) { message ->
-                    when {
-                        message.startsWith("User: ") -> {
-                            UserMessage(message.removePrefix("User: "))
-                        }
-                        message.startsWith("Assistant: ") -> {
-                            AssistantMessage(message.removePrefix("Assistant: "))
-                        }
-                        message.isNotEmpty() -> {
-                            SystemMessage(message)
-                        }
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .navigationBarsPadding(),
+        bottomBar = {
+            Column {
+                // Text field with send button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = viewModel.message,
+                        onValueChange = { viewModel.updateMessage(it) },
+                        label = { Text("Message") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    )
+                    
+                    Button(
+                        onClick = { viewModel.send() },
+                        modifier = Modifier.height(56.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send"
+                        )
                     }
                 }
                 
-                // Add spacer at the end to push content up from the bottom
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
+                // Model buttons
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    for (model in models) {
+                        Downloadable.Button(viewModel, model)
+                    }
                 }
             }
         }
-        
-        // Removed utility buttons (bench, clear, copy)
-        
-        // Text field with send button side by side with comparable heights
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+    ) { paddingValues ->
+        // Messages list
+        LazyColumn(
+            state = scrollState,
+            contentPadding = paddingValues,
+            modifier = Modifier.fillMaxSize(),
+            reverseLayout = false
         ) {
-            OutlinedTextField(
-                value = viewModel.message,
-                onValueChange = { viewModel.updateMessage(it) },
-                label = { Text("Message") },
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp)
-            )
-            
-            Button(
-                onClick = { viewModel.send() },
-                modifier = Modifier.height(56.dp) // Match the typical height of OutlinedTextField
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Send,
-                    contentDescription = "Send"
-                )
+            items(viewModel.messages) { message ->
+                when {
+                    message.startsWith("User: ") -> {
+                        UserMessage(message.removePrefix("User: "))
+                    }
+                    message.startsWith("Assistant: ") -> {
+                        AssistantMessage(message.removePrefix("Assistant: "))
+                    }
+                    message.isNotEmpty() -> {
+                        SystemMessage(message)
+                    }
+                }
             }
-        }
-
-        Column {
-            for (model in models) {
-                Downloadable.Button(viewModel, model)
+            
+            // Add spacer at the end to push content up from the bottom
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
