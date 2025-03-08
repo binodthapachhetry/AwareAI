@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,7 +45,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.core.content.getSystemService
 import com.example.llama.ui.theme.LlamaAndroidTheme
 import java.io.File
@@ -201,10 +206,25 @@ fun MainCompose(
 ) {
     val scrollState = rememberLazyListState()
     
+    // Track keyboard visibility
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    
     // Auto-scroll to the top (which is actually the bottom with reverseLayout=true)
     LaunchedEffect(viewModel.messages.size) {
         if (viewModel.messages.isNotEmpty()) {
             scrollState.animateScrollToItem(0)
+        }
+    }
+    
+    // When keyboard visibility changes, ensure we can scroll the entire list
+    LaunchedEffect(keyboardVisible) {
+        // Small delay to let the keyboard animation complete
+        delay(300)
+        if (viewModel.messages.isNotEmpty()) {
+            // If keyboard is visible, scroll to ensure we can see all content
+            if (keyboardVisible && scrollState.firstVisibleItemIndex > 0) {
+                scrollState.animateScrollToItem(scrollState.firstVisibleItemIndex)
+            }
         }
     }
 
@@ -256,7 +276,10 @@ fun MainCompose(
         // Messages list with reversed layout and reversed items
         LazyColumn(
             state = scrollState,
-            contentPadding = paddingValues,
+            contentPadding = PaddingValues(
+                top = paddingValues.calculateTopPadding(),
+                bottom = paddingValues.calculateBottomPadding() + 8.dp
+            ),
             modifier = Modifier.fillMaxSize(),
             reverseLayout = true  // This makes newest items appear at the bottom
         ) {
@@ -278,6 +301,11 @@ fun MainCompose(
                         SystemMessage(message)
                     }
                 }
+            }
+            
+            // Add a spacer at the end to ensure all content can be scrolled into view
+            item {
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
