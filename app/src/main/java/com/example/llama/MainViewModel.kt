@@ -126,12 +126,6 @@ class MainViewModel(
             // No BOS token - let llama.cpp add it automatically
             append("<|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
 
-//            if (relevantMemories.isNotEmpty()) {
-//                append("<CONTEXT>\n")
-//                relevantMemories.forEach { append("- $it\n") }
-//                append("</CONTEXT>\n\n")
-//            }
-
             // Apply context window strategy
             when (contextConfig.strategy) {
                 ContextStrategy.SLIDING_WINDOW -> {
