@@ -201,10 +201,10 @@ fun MainCompose(
 ) {
     val scrollState = rememberLazyListState()
     
-    // Auto-scroll to the bottom when new messages arrive
+    // Auto-scroll to the top (which is actually the bottom with reverseLayout=true)
     LaunchedEffect(viewModel.messages.size) {
         if (viewModel.messages.isNotEmpty()) {
-            scrollState.animateScrollToItem(viewModel.messages.size - 1)
+            scrollState.animateScrollToItem(0)
         }
     }
 
@@ -253,14 +253,20 @@ fun MainCompose(
             }
         }
     ) { paddingValues ->
-        // Messages list
+        // Messages list with reversed layout and reversed items
         LazyColumn(
             state = scrollState,
             contentPadding = paddingValues,
             modifier = Modifier.fillMaxSize(),
-            reverseLayout = false
+            reverseLayout = true  // This makes newest items appear at the bottom
         ) {
-            items(viewModel.messages) { message ->
+            // Add spacer at the beginning (which is visually at the bottom with reverseLayout=true)
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            
+            // Use reversed list so newest messages are at index 0
+            items(viewModel.messages.reversed()) { message ->
                 when {
                     message.startsWith("User: ") -> {
                         UserMessage(message.removePrefix("User: "))
@@ -272,11 +278,6 @@ fun MainCompose(
                         SystemMessage(message)
                     }
                 }
-            }
-            
-            // Add spacer at the end to push content up from the bottom
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
