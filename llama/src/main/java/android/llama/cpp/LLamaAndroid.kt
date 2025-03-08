@@ -148,25 +148,15 @@ class LLamaAndroid {
                 Log.d(tag, "ncur: ${ncur.value.toString()}")
                 Log.d(tag, "nlen: ${nlen.toString()}")
 
-                var accumulatedText = ""
+                // Emit each token as it's generated
                 while (ncur.value <= nlen) {
                     val str = completion_loop(state.context, state.batch, state.sampler, nlen, ncur)
                     if (str == null) {
                         break
                     }
-
-                    accumulatedText += str
-                    // Emit more frequently on sentence boundaries or when we have enough text
-                    if (accumulatedText.contains(". ") || accumulatedText.contains("? ") ||
-                        accumulatedText.contains("! ") || accumulatedText.length > 20) {
-                        emit(accumulatedText)
-                        accumulatedText = ""
-                    }
-                }
-
-                // Emit any remaining text
-                if (accumulatedText.isNotEmpty()) {
-                    emit(accumulatedText)
+                    
+                    // Emit each chunk immediately without accumulating
+                    emit(str)
                 }
             }
             else -> {}

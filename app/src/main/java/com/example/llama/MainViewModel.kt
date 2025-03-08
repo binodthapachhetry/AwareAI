@@ -56,19 +56,6 @@ class MainViewModel(
     }
 
 
-    // Track last UI update time for throttling
-    private var lastUpdateTime = 0L
-    
-    // Helper function to determine when to update UI
-    private fun shouldUpdateUI(response: String): Boolean {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastUpdateTime > 50) { // Update at most every 50ms
-            lastUpdateTime = currentTime
-            return true
-        }
-        // Also update on sentence boundaries for more responsive feel
-        return response.contains(". ") || response.contains("? ") || response.contains("! ")
-    }
     
     // Helper function to find similar queries in cache
     private fun findSimilarQuery(query: String): String? {
@@ -93,8 +80,8 @@ class MainViewModel(
 
         // Add to messages console for UI
         messages += "User: $text"
-        messages += ""  // Empty string for AI response placeholder
-
+        messages += "Assistant: "  // Start with "Assistant: " prefix
+        
         viewModelScope.launch {
             // Create and add user message to session
             val userMessage = createMessage(text, Message.SenderType.USER)
@@ -105,37 +92,34 @@ class MainViewModel(
 
             // Variables to track the complete response
             val responseBuilder = StringBuilder()
-            var currentResponse = ""
 
-            // Only update UI during streaming, don't modify session
+            // Stream the response with immediate updates
             llamaAndroid.send(context, formatChat = true)
-                .catch { /* error handling */ }
+                .catch { e -> 
+                    Log.e(tag, "Error generating response", e)
+                    messages = messages.dropLast(1) + "Assistant: Error: ${e.message}"
+                }
                 .collect { response ->
                     responseBuilder.append(response)
-                    currentResponse += response
                     
-                    // Update UI less frequently for better performance
-                    if (shouldUpdateUI(currentResponse)) {
-                        // Update UI only, don't modify session
-                        if (messages.last().isEmpty()) {
-                            messages = messages.dropLast(1) + "Assistant: $responseBuilder"
-                        } else {
-                            // More efficient update that doesn't recreate the entire list
-                            val currentMessages = messages.toMutableList()
-                            currentMessages[currentMessages.lastIndex] = "Assistant: $responseBuilder"
-                            messages = currentMessages
-                        }
-                        currentResponse = "" // Reset current response after update
+                    // Update UI immediately with each token
+                    val currentMessages = messages.toMutableList()
+                    
+                    // The last message should already start with "Assistant: "
+                    if (currentMessages.last().startsWith("Assistant: ")) {
+                        // Append to the existing message
+                        currentMessages[currentMessages.lastIndex] = 
+                            currentMessages.last() + response
+                    } else {
+                        // This shouldn't happen, but just in case
+                        currentMessages[currentMessages.lastIndex] = 
+                            "Assistant: " + responseBuilder.toString()
                     }
+                    
+                    messages = currentMessages
                 }
 
-            // Ensure final response is displayed
-            if (currentResponse.isNotEmpty()) {
-                val currentMessages = messages.toMutableList()
-                currentMessages[currentMessages.lastIndex] = "Assistant: $responseBuilder"
-                messages = currentMessages
-            }
-
+            // Process the final response
             val userTagIndex = responseBuilder.toString().indexOf("User:")
             val finalResponseText = if (userTagIndex > 0) {
                 responseBuilder.toString().substring(0, userTagIndex).trim()
