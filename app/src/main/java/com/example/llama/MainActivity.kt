@@ -78,9 +78,9 @@ class MainActivity(
 //            ),
 
             Downloadable(
-                "Llama3.2 1B (int4, 771 MB)",
-                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_0_4_4.gguf?download=true"),
-                File(filesDir, "Llama-3.2-1B-Instruct-Q4_0_4_4.gguf"),
+                "Llama3.2 1B (int4, 808 MB)",
+                Uri.parse("https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf?download=true"),
+                File(filesDir, "Llama-3.2-1B-Instruct-Q4_K_M.gguf"),
             ),
         )
 
@@ -120,7 +120,7 @@ fun MainCompose(
                     Text(
                         it,
                         style = MaterialTheme.typography.bodyLarge.copy(color = LocalContentColor.current),
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(2.dp)
                     )
                 }
             }

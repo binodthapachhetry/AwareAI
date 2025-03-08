@@ -55,13 +55,13 @@ class MainViewModel(
         val text = message
         message = ""
 
-        Log.d(tag, "send() text: $text")
+//        Log.d(tag, "send() text: $text")
 
         // Add to messages console for UI
         messages += "User: $text"
         messages += ""  // Empty string for AI response placeholder
 
-        Log.d(tag, "send() messages: $messages")
+//        Log.d(tag, "send() messages: $messages")
 
         viewModelScope.launch {
             // Create and add user message to session
@@ -71,76 +71,40 @@ class MainViewModel(
             // Prepare context with history and relevant memories
             val context = prepareContext()
 
-            Log.d(tag, "send() context to the LLM: $context.toString()")
-            context.toString()
+            Log.d(tag, "send() context to the LLM: $context")
 
             // Variables to track the complete response
             val responseBuilder = StringBuilder()
             var tempAiMessage: Message? = null
 
-            // Send to LLM
+            // Only update UI during streaming, don't modify session
             llamaAndroid.send(context, formatChat = true)
-                .catch {
-                    Log.e(tag, "send() failed", it)
-                    messages += it.message ?: "Error during LLM processing"
-                }
+                .catch { /* error handling */ }
                 .collect { response ->
-                    // Accumulate the complete response
-                    Log.d(tag, "send() message from the LLM: $response")
                     responseBuilder.append(response)
 
-                    // If there's a temporary message in the session, remove it
-                    if (tempAiMessage != null) {
-                        sessionManager.removeMessage(tempAiMessage!!.id)
-                        Log.d(tag, "send() removing tempAiMessage: $tempAiMessage")
-                    }
-
-                    // Create a new temporary message with the current accumulated response
-                    tempAiMessage = createMessage(responseBuilder.toString(), Message.SenderType.AI)
-                    Log.d(tag, "send() created tempAiMessage: $tempAiMessage")
-                    sessionManager.addMessage(tempAiMessage!!)
-
-                    // Update UI
+                    // Update UI only, don't modify session
                     if (messages.last().isEmpty()) {
-                        messages = messages.dropLast(1) + response
-                        Log.d(tag, "send() messages last is empty")
+                        messages = messages.dropLast(1) + "Assistant: $response"
                     } else {
                         messages = messages.dropLast(1) + (messages.last() + response)
-                        Log.d(tag, "send() messages last is not empty")
                     }
+
                 }
 
-            // After collecting is complete, create the final message
-
-            val fullResponse = responseBuilder.toString()
-
-//            val fullResponse = responseBuilder.toString()
-//                .replace("</ASSISTANT>", "")
-//                .replace("</SYSTEM>", "")
-//                .replace("</USER>", "")
-//                .trim()
-
-            Log.d(tag, "send() got full response from the model: ${fullResponse.toString()}")
-
-//            // Truncate the response if it contains user tags
-//            val userTagIndex = fullResponse.indexOf("<USER>")
-//            if (userTagIndex > 0) {
-//                fullResponse = fullResponse.substring(0, userTagIndex).trim()
-//            }
-
-            // Remove the last temporary message
-            if (tempAiMessage != null) {
-                sessionManager.removeMessage(tempAiMessage!!.id)
-                Log.d(tag, "send() removed tempAiMessage: ${tempAiMessage.toString()}")
+            val userTagIndex = responseBuilder.toString().indexOf("User:")
+            if (userTagIndex > 0) {
+                val finalAiMessage = createMessage(responseBuilder.toString().substring(0, userTagIndex).trim(), Message.SenderType.AI)
+                sessionManager.addMessage(finalAiMessage)
+//                Log.d(tag, "send() created final message: ${finalAiMessage.text}")
+                updateMemory(finalAiMessage)
+            }else{
+                val finalAiMessage = createMessage(responseBuilder.toString(), Message.SenderType.AI)
+                sessionManager.addMessage(finalAiMessage)
+//                Log.d(tag, "send() created final message: ${finalAiMessage.text}")
+                updateMemory(finalAiMessage)
             }
 
-            // Create and add the final complete message
-            val finalAiMessage = createMessage(fullResponse, Message.SenderType.AI)
-            sessionManager.addMessage(finalAiMessage)
-            Log.d(tag, "send() created final message: ${finalAiMessage.text}")
-
-            // Only store the complete message in memory
-            updateMemory(finalAiMessage)
         }
     }
 
@@ -155,8 +119,11 @@ class MainViewModel(
             emptyList()
         }
 
+
         return buildString {
-            append("<SYSTEM>\n$systemPrompt\n</SYSTEM>\n\n")
+//            append("<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
+
+            append("<|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
 
 //            if (relevantMemories.isNotEmpty()) {
 //                append("<CONTEXT>\n")
@@ -171,9 +138,9 @@ class MainViewModel(
                         .takeLast(contextConfig.nContext)
                         .forEach { message ->
                             when (message.sender) {
-                                Message.SenderType.USER -> append("User: ${message.text}\n")
-                                Message.SenderType.AI -> append("Assistant: ${message.text}\n")
-                                else -> append("${message.sender}: ${message.text}\n")
+                                Message.SenderType.USER -> append("<|start_header_id|>user<|end_header_id|>${message.text}<|eot_id|>")
+                                Message.SenderType.AI -> append("<|start_header_id|>assistant<|end_header_id|>${message.text}<|eot_id|>")
+                                else -> append("${message.sender}: ${message.text}")
                             }
                         }
                 }
@@ -193,7 +160,7 @@ class MainViewModel(
 
             // Add a final prompt for the AI to respond
             if (session.messages.lastOrNull()?.sender == Message.SenderType.USER) {
-                append("Assistant:")
+                append("<|start_header_id|>assistant<|end_header_id|>\n\n")
             }
         }
     }
