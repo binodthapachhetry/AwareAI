@@ -19,15 +19,17 @@ class MainViewModel(
     
     // Helper function to find a message by text and sender type
     fun getMessageForText(text: String, senderType: Message.SenderType): Message? {
-        return viewModelScope.run {
-            try {
-                val session = sessionManager.requireActiveSession()
-                session.messages.lastOrNull { 
-                    it.sender == senderType && it.text.trim() == text.trim() 
-                }
-            } catch (e: Exception) {
-                null
+        return try {
+            // Use a non-suspend way to get the current session
+            val session = sessionManager.sessions.value.find { 
+                it.id == sessionManager.activeSessionId.value 
+            } ?: return null
+            
+            session.messages.lastOrNull { 
+                it.sender == senderType && it.text.trim() == text.trim() 
             }
+        } catch (e: Exception) {
+            null
         }
     }
 
