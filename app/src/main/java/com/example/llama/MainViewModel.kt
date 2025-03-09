@@ -16,17 +16,17 @@ class MainViewModel(
     private val memoryManager: MemoryManager = MemoryManager(),
     private val contextConfig: ContextConfig = ContextConfig()
 ) : ViewModel() {
-    
+
     // Helper function to find a message by text and sender type
     fun getMessageForText(text: String, senderType: Message.SenderType): Message? {
         return try {
             // Use a non-suspend way to get the current session
-            val session = sessionManager.sessions.value.find { 
-                it.id == sessionManager.activeSessionId.value 
+            val session = sessionManager.sessions.value.find {
+                it.id == sessionManager.activeSessionId.value
             } ?: return null
-            
-            session.messages.lastOrNull { 
-                it.sender == senderType && it.text.trim() == text.trim() 
+
+            session.messages.lastOrNull {
+                it.sender == senderType && it.text.trim() == text.trim()
             }
         } catch (e: Exception) {
             null
@@ -39,18 +39,7 @@ class MainViewModel(
     private val tag: String? = this::class.simpleName
 
     // Define the system prompt
-    private val systemPrompt = """
-        You are a helpful AI assistant. You aim to be accurate, informative, and engaging.
-        You should be direct in your responses and avoid disclaimers.
-        If you're unsure about something, admit it rather than making assumptions.
-        Remember the conversation context and respond appropriately to follow-up questions.
-        Keep your responses concise but complete.
-
-        Format your responses with single line breaks between paragraphs. Avoid using multiple consecutive line breaks.
-
-        IMPORTANT: Only respond as the assistant. DO NOT generate user messages or continue the conversation beyond your response.
-        Simply provide your response without any XML tags.
-    """.trimIndent()
+    private val systemPrompt = """You are a helpful, concise assistant. Respond directly without disclaimers.""".trimIndent()
 
     // UI state
     var messages by mutableStateOf(listOf<String>())
@@ -77,12 +66,12 @@ class MainViewModel(
     private fun findSimilarQuery(query: String): String? {
         // Normalize the query
         val normalizedQuery = query.lowercase().trim()
-        
+
         // First try exact match
         responseCache.entries.firstOrNull {
             it.key.lowercase().trim() == normalizedQuery
         }?.let { return it.value }
-        
+
         // Then try fuzzy matching for short queries (more likely to have similar variants)
         if (normalizedQuery.length < 20) {
             responseCache.entries.firstOrNull {
@@ -90,22 +79,22 @@ class MainViewModel(
                 similarity > 0.8 // 80% similarity threshold
             }?.let { return it.value }
         }
-        
+
         return null
     }
-    
+
     // Simple string similarity calculation (Jaccard similarity)
     private fun calculateSimilarity(s1: String, s2: String): Double {
         if (s1 == s2) return 1.0
         if (s1.isEmpty() || s2.isEmpty()) return 0.0
-        
+
         // Create sets of words
         val words1 = s1.split(Regex("\\s+")).toSet()
         val words2 = s2.split(Regex("\\s+")).toSet()
-        
+
         val intersection = words1.intersect(words2).size
         val union = words1.union(words2).size
-        
+
         return intersection.toDouble() / union.toDouble()
     }
 
@@ -121,12 +110,12 @@ class MainViewModel(
         if (cachedResponse != null) {
             // Use cached response for immediate feedback
             messages += "Assistant: $cachedResponse"
-            
+
             // Still add to session history
             viewModelScope.launch {
                 val userMessage = createMessage(text, Message.SenderType.USER)
                 sessionManager.addMessage(userMessage)
-                
+
                 val aiMessage = createMessage(cachedResponse, Message.SenderType.AI)
                 sessionManager.addMessage(aiMessage)
             }
@@ -143,10 +132,10 @@ class MainViewModel(
 
             // Prepare context with history and relevant memories
             val context = prepareContext()
-            
+
             // Count tokens in the prompt for performance metrics
             val promptTokenCount = countTokens(context)
-            
+
             // Timing variables for performance metrics
             val startTime = System.currentTimeMillis()
             var firstTokenTime: Long = 0
@@ -164,17 +153,17 @@ class MainViewModel(
                 }
                 .collect { response ->
                     val currentTime = System.currentTimeMillis()
-                    
+
                     // Track first token time
                     if (!firstChunkReceived) {
                         firstTokenTime = currentTime - startTime
                         Log.d(tag, "Time to first token: $firstTokenTime ms")
                     }
-                    
+
                     // Count tokens in the response chunk
                     val chunkTokens = countTokens(response)
                     tokenCount += chunkTokens
-                    
+
                     responseBuilder.append(response)
 
                     // Update UI with the response
@@ -196,14 +185,14 @@ class MainViewModel(
             // Calculate final performance metrics
             val endTime = System.currentTimeMillis()
             val totalTime = endTime - startTime
-            
+
             // Calculate average time per token (excluding first token)
             val averageTimePerToken = if (tokenCount > 1) {
                 (totalTime - firstTokenTime).toFloat() / (tokenCount - 1)
             } else {
                 0f
             }
-            
+
             Log.d(tag, "Performance metrics: promptTokens=$promptTokenCount, responseTokens=$tokenCount, " +
                        "ttft=${firstTokenTime}ms, avg=${averageTimePerToken}ms/token, total=${totalTime}ms")
 
@@ -217,7 +206,7 @@ class MainViewModel(
 
             // Add to cache for future use
             responseCache[text] = finalResponseText
-            
+
             // Create performance metrics
             val metrics = Message.PerformanceMetrics(
                 promptTokenCount = promptTokenCount,
@@ -229,11 +218,11 @@ class MainViewModel(
 
             // Create the final AI message with performance metrics
             val finalAiMessage = createMessage(
-                text = finalResponseText, 
+                text = finalResponseText,
                 sender = Message.SenderType.AI,
                 performanceMetrics = metrics
             )
-            
+
             sessionManager.addMessage(finalAiMessage)
             updateMemory(finalAiMessage)
         }
@@ -253,7 +242,7 @@ class MainViewModel(
                     // Check cache for the last user message
                     val lastUserMessage = session.messages.lastOrNull { it.sender == Message.SenderType.USER }?.text
                     val cachedResponse = lastUserMessage?.let { findSimilarQuery(it) }
-                    
+
                     if (cachedResponse != null) {
                         // If we have a cached response, use minimal context
                         Log.d(tag, "Using cached response for query")
