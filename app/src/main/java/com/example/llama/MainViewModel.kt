@@ -16,6 +16,20 @@ class MainViewModel(
     private val memoryManager: MemoryManager = MemoryManager(),
     private val contextConfig: ContextConfig = ContextConfig()
 ) : ViewModel() {
+    
+    // Helper function to find a message by text and sender type
+    fun getMessageForText(text: String, senderType: Message.SenderType): Message? {
+        return viewModelScope.run {
+            try {
+                val session = sessionManager.requireActiveSession()
+                session.messages.lastOrNull { 
+                    it.sender == senderType && it.text.trim() == text.trim() 
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     // Add a response cache for common queries
     private val responseCache = mutableMapOf<String, String>()
@@ -127,6 +141,14 @@ class MainViewModel(
 
             // Prepare context with history and relevant memories
             val context = prepareContext()
+            
+            // Count tokens in the prompt for performance metrics
+            val promptTokenCount = countTokens(context)
+            
+            // Timing variables for performance metrics
+            val startTime = System.currentTimeMillis()
+            var firstTokenTime: Long = 0
+            var tokenCount = 0
 
             // Variables to track the complete response
             val responseBuilder = StringBuilder()
@@ -139,6 +161,18 @@ class MainViewModel(
                     messages = messages.dropLast(1) + "Assistant: Error: ${e.message}"
                 }
                 .collect { response ->
+                    val currentTime = System.currentTimeMillis()
+                    
+                    // Track first token time
+                    if (!firstChunkReceived) {
+                        firstTokenTime = currentTime - startTime
+                        Log.d(tag, "Time to first token: $firstTokenTime ms")
+                    }
+                    
+                    // Count tokens in the response chunk
+                    val chunkTokens = countTokens(response)
+                    tokenCount += chunkTokens
+                    
                     responseBuilder.append(response)
 
                     // Update UI with the response
@@ -157,6 +191,20 @@ class MainViewModel(
                     messages = currentMessages
                 }
 
+            // Calculate final performance metrics
+            val endTime = System.currentTimeMillis()
+            val totalTime = endTime - startTime
+            
+            // Calculate average time per token (excluding first token)
+            val averageTimePerToken = if (tokenCount > 1) {
+                (totalTime - firstTokenTime).toFloat() / (tokenCount - 1)
+            } else {
+                0f
+            }
+            
+            Log.d(tag, "Performance metrics: promptTokens=$promptTokenCount, responseTokens=$tokenCount, " +
+                       "ttft=${firstTokenTime}ms, avg=${averageTimePerToken}ms/token, total=${totalTime}ms")
+
             // Process the final response
             val userTagIndex = responseBuilder.toString().indexOf("User:")
             val finalResponseText = if (userTagIndex > 0) {
@@ -167,8 +215,23 @@ class MainViewModel(
 
             // Add to cache for future use
             responseCache[text] = finalResponseText
+            
+            // Create performance metrics
+            val metrics = Message.PerformanceMetrics(
+                promptTokenCount = promptTokenCount,
+                responseTokenCount = tokenCount,
+                timeToFirstToken = firstTokenTime,
+                averageTimePerToken = averageTimePerToken,
+                totalGenerationTime = totalTime
+            )
 
-            val finalAiMessage = createMessage(finalResponseText, Message.SenderType.AI)
+            // Create the final AI message with performance metrics
+            val finalAiMessage = createMessage(
+                text = finalResponseText, 
+                sender = Message.SenderType.AI,
+                performanceMetrics = metrics
+            )
+            
             sessionManager.addMessage(finalAiMessage)
             updateMemory(finalAiMessage)
         }
@@ -240,7 +303,8 @@ class MainViewModel(
     private fun createMessage(
         text: String,
         sender: Message.SenderType,
-        modelParams: Message.ModelParams? = null
+        modelParams: Message.ModelParams? = null,
+        performanceMetrics: Message.PerformanceMetrics? = null
     ): Message {
         return Message(
             text = text,
@@ -248,7 +312,8 @@ class MainViewModel(
             metadata = Message.MessageMetadata(
                 tokens = countTokens(text),
                 contextReferences = emptyList(),
-                modelParams = modelParams
+                modelParams = modelParams,
+                performanceMetrics = performanceMetrics
             )
         )
     }

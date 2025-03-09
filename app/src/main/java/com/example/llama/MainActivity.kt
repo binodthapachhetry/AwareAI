@@ -233,6 +233,20 @@ fun AssistantMessage(text: String) {
 }
 
 @Composable
+fun PerformanceMetricsDisplay(metrics: Message.PerformanceMetrics?) {
+    metrics?.let {
+        Text(
+            text = "Prompt: ${it.promptTokenCount} tokens | TTFT: ${it.timeToFirstToken}ms | " +
+                  "Avg: ${String.format("%.1f", it.averageTimePerToken)}ms/token | " +
+                  "Total: ${it.totalGenerationTime}ms",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(top = 2.dp, start = 8.dp)
+        )
+    }
+}
+
+@Composable
 fun SystemMessage(text: String) {
     Box(
         modifier = Modifier
@@ -348,7 +362,12 @@ fun MainCompose(
                         UserMessage(message.removePrefix("User: "))
                     }
                     message.startsWith("Assistant: ") -> {
-                        AssistantMessage(message.removePrefix("Assistant: "))
+                        val text = message.removePrefix("Assistant: ")
+                        AssistantMessage(text)
+                        
+                        // Find the corresponding message in the session to get metrics
+                        val sessionMessage = viewModel.getMessageForText(text, Message.SenderType.AI)
+                        PerformanceMetricsDisplay(sessionMessage?.metadata?.performanceMetrics)
                     }
                     message.isNotEmpty() -> {
                         SystemMessage(message)
