@@ -126,159 +126,189 @@ class MainViewModel(
         messages += "Assistant: ..." // Typing indicator
 
         viewModelScope.launch {
-            // Create and add user message to session
-            val userMessage = createMessage(text, Message.SenderType.USER)
-            sessionManager.addMessage(userMessage)
+            try {
+                // Create and add user message to session
+                val userMessage = createMessage(text, Message.SenderType.USER)
+                sessionManager.addMessage(userMessage)
 
-            // Prepare context with history and relevant memories
-            val context = prepareContext()
+                // Prepare context with history and relevant memories
+                val context = prepareContext()
 
-            // Count tokens in the prompt for performance metrics
-            val promptTokenCount = countTokens(context)
+                // Count tokens in the prompt for performance metrics
+                val promptTokenCount = countTokens(context)
 
-            // Timing variables for performance metrics
-            val startTime = System.currentTimeMillis()
-            var firstTokenTime: Long = 0
-            var tokenCount = 0
+                // Timing variables for performance metrics
+                val startTime = System.currentTimeMillis()
+                var firstTokenTime: Long = 0
+                var tokenCount = 0
 
-            // Variables to track the complete response
-            val responseBuilder = StringBuilder()
-            var firstChunkReceived = false
+                // Variables to track the complete response
+                val responseBuilder = StringBuilder()
+                var firstChunkReceived = false
 
-            // Stream the response with immediate updates
-            llamaAndroid.send(context, formatChat = true)
-                .catch { e ->
-                    Log.e(tag, "Error generating response", e)
-                    messages = messages.dropLast(1) + "Assistant: Error: ${e.message}"
-                }
-                .collect { response ->
-                    val currentTime = System.currentTimeMillis()
+                // Stream the response with improved error handling
+                llamaAndroid.send(context, formatChat = true)
+                    .catch { e ->
+                        Log.e(tag, "Error generating response", e)
+                        
+                        // Check for binder errors
+                        if (e.message?.contains("ProcessState") == true || 
+                            e.message?.contains("binder") == true) {
+                            
+                            // Handle binder error specifically
+                            messages = messages.dropLast(1) + 
+                                "Assistant: Sorry, I encountered a system limitation. " +
+                                "Please clear the conversation and try again."
+                            
+                            // Try to reset the model
+                            try {
+                                llamaAndroid.clearCache()
+                            } catch (ex: Exception) {
+                                Log.e(tag, "Error resetting model cache", ex)
+                            }
+                        } else {
+                            // Handle other errors
+                            messages = messages.dropLast(1) + "Assistant: Error: ${e.message}"
+                        }
+                    }
+                    .collect { response ->
+                        val currentTime = System.currentTimeMillis()
 
-                    // Track first token time
-                    if (!firstChunkReceived) {
-                        firstTokenTime = currentTime - startTime
-                        Log.d(tag, "Time to first token: $firstTokenTime ms")
+                        // Track first token time
+                        if (!firstChunkReceived) {
+                            firstTokenTime = currentTime - startTime
+                            Log.d(tag, "Time to first token: $firstTokenTime ms")
+                        }
+
+                        // Count tokens in the response chunk
+                        val chunkTokens = countTokens(response)
+                        tokenCount += chunkTokens
+
+                        responseBuilder.append(response)
+
+                        // Update UI with the response
+                        val currentMessages = messages.toMutableList()
+
+                        if (!firstChunkReceived) {
+                            // Replace typing indicator with first chunk of actual response
+                            currentMessages[currentMessages.lastIndex] = "Assistant: " + response
+                            firstChunkReceived = true
+                        } else {
+                            // Append to the existing message
+                            currentMessages[currentMessages.lastIndex] =
+                                currentMessages.last() + response
+                        }
+
+                        messages = currentMessages
                     }
 
-                    // Count tokens in the response chunk
-                    val chunkTokens = countTokens(response)
-                    tokenCount += chunkTokens
+                // Calculate final performance metrics
+                val endTime = System.currentTimeMillis()
+                val totalTime = endTime - startTime
 
-                    responseBuilder.append(response)
-
-                    // Update UI with the response
-                    val currentMessages = messages.toMutableList()
-
-                    if (!firstChunkReceived) {
-                        // Replace typing indicator with first chunk of actual response
-                        currentMessages[currentMessages.lastIndex] = "Assistant: " + response
-                        firstChunkReceived = true
-                    } else {
-                        // Append to the existing message
-                        currentMessages[currentMessages.lastIndex] =
-                            currentMessages.last() + response
-                    }
-
-                    messages = currentMessages
+                // Calculate average time per token (excluding first token)
+                val averageTimePerToken = if (tokenCount > 1) {
+                    (totalTime - firstTokenTime).toFloat() / (tokenCount - 1)
+                } else {
+                    0f
                 }
 
-            // Calculate final performance metrics
-            val endTime = System.currentTimeMillis()
-            val totalTime = endTime - startTime
+                Log.d(tag, "Performance metrics: promptTokens=$promptTokenCount, responseTokens=$tokenCount, " +
+                           "ttft=${firstTokenTime}ms, avg=${averageTimePerToken}ms/token, total=${totalTime}ms")
 
-            // Calculate average time per token (excluding first token)
-            val averageTimePerToken = if (tokenCount > 1) {
-                (totalTime - firstTokenTime).toFloat() / (tokenCount - 1)
-            } else {
-                0f
+                // Process the final response
+                val userTagIndex = responseBuilder.toString().indexOf("User:")
+                val finalResponseText = if (userTagIndex > 0) {
+                    responseBuilder.toString().substring(0, userTagIndex).trim()
+                } else {
+                    responseBuilder.toString()
+                }
+
+                // Add to cache for future use
+                responseCache[text] = finalResponseText
+
+                // Create performance metrics
+                val metrics = Message.PerformanceMetrics(
+                    promptTokenCount = promptTokenCount,
+                    responseTokenCount = tokenCount,
+                    timeToFirstToken = firstTokenTime,
+                    averageTimePerToken = averageTimePerToken,
+                    totalGenerationTime = totalTime
+                )
+
+                // Create the final AI message with performance metrics
+                val finalAiMessage = createMessage(
+                    text = finalResponseText,
+                    sender = Message.SenderType.AI,
+                    performanceMetrics = metrics
+                )
+
+                sessionManager.addMessage(finalAiMessage)
+                updateMemory(finalAiMessage)
+            } catch (e: Exception) {
+                // Global error handler
+                Log.e(tag, "Error in send()", e)
+                messages = messages.dropLast(1) + "Assistant: Sorry, an error occurred. Please try again."
             }
-
-            Log.d(tag, "Performance metrics: promptTokens=$promptTokenCount, responseTokens=$tokenCount, " +
-                       "ttft=${firstTokenTime}ms, avg=${averageTimePerToken}ms/token, total=${totalTime}ms")
-
-            // Process the final response
-            val userTagIndex = responseBuilder.toString().indexOf("User:")
-            val finalResponseText = if (userTagIndex > 0) {
-                responseBuilder.toString().substring(0, userTagIndex).trim()
-            } else {
-                responseBuilder.toString()
-            }
-
-            // Add to cache for future use
-            responseCache[text] = finalResponseText
-
-            // Create performance metrics
-            val metrics = Message.PerformanceMetrics(
-                promptTokenCount = promptTokenCount,
-                responseTokenCount = tokenCount,
-                timeToFirstToken = firstTokenTime,
-                averageTimePerToken = averageTimePerToken,
-                totalGenerationTime = totalTime
-            )
-
-            // Create the final AI message with performance metrics
-            val finalAiMessage = createMessage(
-                text = finalResponseText,
-                sender = Message.SenderType.AI,
-                performanceMetrics = metrics
-            )
-
-            sessionManager.addMessage(finalAiMessage)
-            updateMemory(finalAiMessage)
         }
     }
 
     private suspend fun prepareContext(): String {
         val session = sessionManager.requireActiveSession()
-        // Removed relevantMemories lookup to reduce latency
-
+        
+        // Set a strict token budget
+        val MAX_CONTEXT_TOKENS = 512 // Very aggressive limit
+        var tokenBudget = MAX_CONTEXT_TOKENS
+        
         return buildString {
-            // No BOS token - let llama.cpp add it automatically
+            // Add system prompt (essential)
+            val systemPromptTokens = countTokens(systemPrompt)
             append("<|start_header_id|>system<|end_header_id|>\n\n$systemPrompt<|eot_id|>")
-
-            // Apply context window strategy with reduced context size
-            when (contextConfig.strategy) {
-                ContextStrategy.SLIDING_WINDOW -> {
-                    // Check cache for the last user message
-                    val lastUserMessage = session.messages.lastOrNull { it.sender == Message.SenderType.USER }?.text
-                    val cachedResponse = lastUserMessage?.let { findSimilarQuery(it) }
-
-                    if (cachedResponse != null) {
-                        // If we have a cached response, use minimal context
-                        Log.d(tag, "Using cached response for query")
-                        val lastMessage = session.messages.last()
-                        append("<|start_header_id|>user<|end_header_id|>${lastMessage.text}<|eot_id|>")
-                    } else {
-                        // Otherwise use normal (but still limited) context
-                        session.messages
-                            .takeLast(8) // Further reduced for faster processing
-                            .forEach { message ->
-                                when (message.sender) {
-                                    Message.SenderType.USER -> append("<|start_header_id|>user<|end_header_id|>${message.text}<|eot_id|>")
-                                    Message.SenderType.AI -> append("<|start_header_id|>assistant<|end_header_id|>${message.text}<|eot_id|>")
-                                    else -> append("${message.sender}: ${message.text}")
-                                }
-                            }
-                    }
-                }
-                ContextStrategy.SUMMARY -> {
-                    // Implement summarization in the future
-                    session.messages
-                        .takeLast(6) // Further reduced for faster processing
-                        .forEach { message ->
-                            when (message.sender) {
-                                Message.SenderType.USER -> append("User: ${message.text}\n")
-                                Message.SenderType.AI -> append("Assistant: ${message.text}\n")
-                                else -> append("${message.sender}: ${message.text}\n")
-                            }
-                        }
+            tokenBudget -= systemPromptTokens
+            
+            // Get the most recent user message (must include)
+            val lastUserMessage = session.messages.lastOrNull { it.sender == Message.SenderType.USER }
+            if (lastUserMessage != null) {
+                val lastUserTokens = countTokens(lastUserMessage.text)
+                tokenBudget -= lastUserTokens
+            }
+            
+            // Add conversation history within remaining budget
+            val relevantMessages = mutableListOf<Message>()
+            
+            // Start from most recent and work backwards
+            for (message in session.messages.reversed()) {
+                // Skip the last user message (already accounted for)
+                if (message == lastUserMessage) continue
+                
+                val messageTokens = countTokens(message.text)
+                if (tokenBudget - messageTokens >= 0) {
+                    relevantMessages.add(0, message) // Add to front to maintain order
+                    tokenBudget -= messageTokens
+                } else {
+                    // No more budget for additional messages
+                    break
                 }
             }
-
+            
+            Log.d(tag, "Context includes ${relevantMessages.size} messages within token budget")
+            
+            // Add the messages that fit within budget
+            for (message in relevantMessages) {
+                when (message.sender) {
+                    Message.SenderType.USER -> append("<|start_header_id|>user<|end_header_id|>${message.text}<|eot_id|>")
+                    Message.SenderType.AI -> append("<|start_header_id|>assistant<|end_header_id|>${message.text}<|eot_id|>")
+                    else -> append("${message.sender}: ${message.text}")
+                }
+            }
+            
+            // Add the last user message (always include)
+            if (lastUserMessage != null) {
+                append("<|start_header_id|>user<|end_header_id|>${lastUserMessage.text}<|eot_id|>")
+            }
+            
             // Add a final prompt for the AI to respond
-            if (session.messages.lastOrNull()?.sender == Message.SenderType.USER) {
-                append("<|start_header_id|>assistant<|end_header_id|>\n\n")
-            }
+            append("<|start_header_id|>assistant<|end_header_id|>\n\n")
         }
     }
 
@@ -310,8 +340,20 @@ class MainViewModel(
     }
 
     private fun countTokens(text: String): Int {
-        // Simple token counting implementation
-        return text.split(" ").size
+        // Improved token counting implementation
+        // This is still an approximation but better than simple word splitting
+        // A proper tokenizer would be more accurate but more complex
+        
+        // Count words (basic approximation)
+        val wordCount = text.split(Regex("\\s+")).size
+        
+        // Count punctuation (each is typically a separate token)
+        val punctuationCount = text.count { it in ".,!?;:()[]{}\"'" }
+        
+        // Count special tokens in the format (each is typically a separate token)
+        val specialTokenCount = text.count { it == '<' || it == '>' || it == '|' }
+        
+        return wordCount + punctuationCount + (specialTokenCount / 2) // Divide by 2 as we count pairs
     }
 
     fun bench(pp: Int, tg: Int, pl: Int, nr: Int = 1) {
@@ -359,8 +401,19 @@ class MainViewModel(
         messages = listOf()
 
         viewModelScope.launch {
-            val sessionId = sessionManager.requireActiveSession().id
-            sessionManager.clearSessionMessages(sessionId)
+            try {
+                // Clear KV cache to prevent memory issues
+                llamaAndroid.clearCache()
+                
+                // Clear session messages
+                val sessionId = sessionManager.requireActiveSession().id
+                sessionManager.clearSessionMessages(sessionId)
+                
+                log("Conversation cleared and memory reset")
+            } catch (e: Exception) {
+                Log.e(tag, "Error clearing conversation", e)
+                log("Error clearing conversation: ${e.message}")
+            }
         }
     }
 

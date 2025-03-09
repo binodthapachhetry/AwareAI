@@ -200,6 +200,23 @@ class LLamaAndroid {
         }
     }
 
+    /**
+     * Clears the KV cache to free up memory and reset context
+     */
+    suspend fun clearCache() {
+        withContext(runLoop) {
+            when (val state = threadLocalState.get()) {
+                is State.Loaded -> {
+                    kv_cache_clear(state.context)
+                    Log.d(tag, "KV cache cleared")
+                }
+                else -> {
+                    Log.d(tag, "No model loaded, nothing to clear")
+                }
+            }
+        }
+    }
+
     companion object {
         private class IntVar(value: Int) {
             @Volatile

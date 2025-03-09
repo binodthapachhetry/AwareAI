@@ -235,14 +235,22 @@ fun AssistantMessage(text: String) {
 @Composable
 fun PerformanceMetricsDisplay(metrics: Message.PerformanceMetrics?) {
     metrics?.let {
-        Text(
-            text = "Prompt: ${it.promptTokenCount} tokens | TTFT: ${it.timeToFirstToken}ms | " +
-                  "Avg: ${String.format("%.1f", it.averageTimePerToken)}ms/token | " +
-                  "Total: ${it.totalGenerationTime}ms",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        Column(
             modifier = Modifier.padding(top = 2.dp, start = 8.dp)
-        )
+        ) {
+            Text(
+                text = "Prompt: ${it.promptTokenCount} tokens | TTFT: ${it.timeToFirstToken}ms",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+            
+            Text(
+                text = "Avg: ${String.format("%.1f", it.averageTimePerToken)}ms/token | " +
+                      "Total: ${it.totalGenerationTime}ms",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
     }
 }
 
@@ -271,6 +279,7 @@ fun MainCompose(
     dm: DownloadManager, // Keep this parameter even though we don't use it
     models: List<Downloadable>
 ) {
+    // Add a clear conversation button
     val scrollState = rememberLazyListState()
 
     // Track keyboard visibility
@@ -329,10 +338,21 @@ fun MainCompose(
                     }
                 }
 
-                // Model buttons
+                // Model buttons and clear button
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    // Add clear conversation button
+                    Button(
+                        onClick = { viewModel.clear() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("Clear Conversation")
+                    }
+                    
+                    // Model buttons
                     for (model in models) {
                         Downloadable.Button(viewModel, model)
                     }
