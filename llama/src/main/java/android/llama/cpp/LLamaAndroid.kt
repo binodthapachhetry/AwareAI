@@ -18,9 +18,15 @@ class LLamaAndroid {
     private val runLoop: CoroutineDispatcher = Executors.newSingleThreadExecutor {
         thread(start = false, name = "Llm-RunLoop") {
             Log.d(tag, "Dedicated thread for native code: ${Thread.currentThread().name}")
+            
+            // Set thread priority to background to reduce system impact
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
 
             // No-op if called more than once.
             System.loadLibrary("llama-android")
+            
+            // Disable fork server
+            System.setProperty("LLAMA_FORKSERVER_DISABLE", "1")
 
             // Set llama log handler to Android
             log_to_android()
